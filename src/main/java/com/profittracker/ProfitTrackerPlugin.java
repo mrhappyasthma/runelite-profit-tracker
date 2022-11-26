@@ -13,6 +13,9 @@ import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
+import net.runelite.api.events.VarbitChanged;
+
+import java.util.Arrays;
 
 @Slf4j
 @PluginDescriptor(
@@ -32,6 +35,17 @@ public class ProfitTrackerPlugin extends Plugin
     private boolean skipTickForProfitCalculation;
     private boolean inventoryValueChanged;
     private boolean inProfitTrackSession;
+    private boolean runePouchContentsChanged;
+    private int[] RUNE_POUCH_VARBITS = {
+            Varbits.RUNE_POUCH_AMOUNT1,
+            Varbits.RUNE_POUCH_AMOUNT2,
+            Varbits.RUNE_POUCH_AMOUNT3,
+            Varbits.RUNE_POUCH_AMOUNT4,
+            Varbits.RUNE_POUCH_RUNE1,
+            Varbits.RUNE_POUCH_RUNE2,
+            Varbits.RUNE_POUCH_RUNE3,
+            Varbits.RUNE_POUCH_RUNE4
+    };
 
     @Inject
     private Client client;
@@ -86,6 +100,8 @@ public class ProfitTrackerPlugin extends Plugin
 
         inProfitTrackSession = false;
 
+        runePouchContentsChanged = false;
+
     }
 
     private void startProfitTrackingSession()
@@ -135,7 +151,7 @@ public class ProfitTrackerPlugin extends Plugin
             return;
         }
 
-        if (inventoryValueChanged)
+        if (inventoryValueChanged || runePouchContentsChanged)
         {
             tickProfit = calculateTickProfit();
 
@@ -151,6 +167,7 @@ public class ProfitTrackerPlugin extends Plugin
             }
 
             inventoryValueChanged = false;
+            runePouchContentsChanged = false;
         }
 
     }
@@ -218,6 +235,12 @@ public class ProfitTrackerPlugin extends Plugin
 
         }
 
+    }
+
+    @Subscribe
+    public void onVarbitChanged(VarbitChanged event)
+    {
+        runePouchContentsChanged = Arrays.stream(RUNE_POUCH_VARBITS).anyMatch(vb -> event.getVarbitId() == vb);
     }
 
     @Subscribe

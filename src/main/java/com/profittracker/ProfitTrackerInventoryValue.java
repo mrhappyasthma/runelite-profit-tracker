@@ -18,6 +18,27 @@ public class ProfitTrackerInventoryValue {
 
     static final int EMPTY_SLOT_ITEMID = -1;
 
+    private final int[] RUNE_POUCH_ITEM_IDS = {
+            ItemID.RUNE_POUCH,
+            ItemID.RUNE_POUCH_L,
+            ItemID.DIVINE_RUNE_POUCH,
+            ItemID.DIVINE_RUNE_POUCH_L
+    };
+
+    private final int[] RUNE_POUCH_AMOUNT_VARBITS = {
+            Varbits.RUNE_POUCH_AMOUNT1,
+            Varbits.RUNE_POUCH_AMOUNT2,
+            Varbits.RUNE_POUCH_AMOUNT3,
+            Varbits.RUNE_POUCH_AMOUNT4
+    };
+
+    private final int[] RUNE_POUCH_RUNE_VARBITS = {
+            Varbits.RUNE_POUCH_RUNE1,
+            Varbits.RUNE_POUCH_RUNE2,
+            Varbits.RUNE_POUCH_RUNE3,
+            Varbits.RUNE_POUCH_RUNE4
+    };
+
     private final ItemManager itemManager;
     private final Client client;
 
@@ -44,6 +65,12 @@ public class ProfitTrackerInventoryValue {
         if (itemId == EMPTY_SLOT_ITEMID)
         {
             return 0;
+        }
+
+        if (Arrays.stream(RUNE_POUCH_ITEM_IDS).anyMatch(pouchID -> itemId == pouchID))
+        {
+            log.info(String.format("calculateItemValue itemId = %d (Rune pouch variant)", itemId));
+            return calculateRunePouchValue();
         }
 
         log.info(String.format("calculateItemValue itemId = %d", itemId));
@@ -93,6 +120,32 @@ public class ProfitTrackerInventoryValue {
         calculate total equipment value
          */
         return calculateContainerValue(InventoryID.EQUIPMENT);
+    }
+
+    public long calculateRunePouchValue()
+    {
+        long runePouchValue = 0;
+        EnumComposition runePouchEnum = client.getEnum(EnumID.RUNEPOUCH_RUNE);
+
+        for (int i = 0; i < RUNE_POUCH_AMOUNT_VARBITS.length; i++)
+        {
+            runePouchValue += calculateRuneValue(
+                    client.getVarbitValue(RUNE_POUCH_RUNE_VARBITS[i]),
+                    client.getVarbitValue(RUNE_POUCH_AMOUNT_VARBITS[i]),
+                    runePouchEnum
+            );
+        }
+
+        return runePouchValue;
+    }
+
+    public long calculateRuneValue(int runeId, int runeQuantity, EnumComposition runePouchEnum)
+    {
+        if (runeQuantity == 0){
+            return 0;
+        }
+        log.info(String.format("calculateRuneValue runeId = %d", runeId));
+        return itemManager.getItemPrice(runePouchEnum.getIntValue(runeId)) * runeQuantity;
     }
 
     public long calculateInventoryAndEquipmentValue()
