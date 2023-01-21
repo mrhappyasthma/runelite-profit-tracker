@@ -217,7 +217,7 @@ public class ProfitTrackerGoldDrops {
         We create gold drops by faking a fake xp drop :)
          */
 
-        log.info(String.format("goldDrop: %d", amount));
+        log.debug(String.format("goldDrop: %d", amount));
 
         // save the value and mark an ongoing gold drop
         currentGoldDropValue = amount;

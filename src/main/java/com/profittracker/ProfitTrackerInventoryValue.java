@@ -57,7 +57,7 @@ public class ProfitTrackerInventoryValue {
         if (itemId < -1)
         {
             // unexpected
-            log.info("Bad item id!" + itemId);
+            log.debug("Bad item id!" + itemId);
             return 0;
 
         }
@@ -69,11 +69,11 @@ public class ProfitTrackerInventoryValue {
 
         if (Arrays.stream(RUNE_POUCH_ITEM_IDS).anyMatch(pouchID -> itemId == pouchID))
         {
-            log.info(String.format("calculateItemValue itemId = %d (Rune pouch variant)", itemId));
+            log.debug(String.format("calculateItemValue itemId = %d (Rune pouch variant)", itemId));
             return calculateRunePouchValue();
         }
 
-        log.info(String.format("calculateItemValue itemId = %d", itemId));
+        log.debug(String.format("calculateItemValue itemId = %d", itemId));
 
         // multiply quantity  by GE value
         return item.getQuantity() * (itemManager.getItemPrice(itemId));
@@ -144,7 +144,7 @@ public class ProfitTrackerInventoryValue {
         if (runeQuantity == 0){
             return 0;
         }
-        log.info(String.format("calculateRuneValue runeId = %d", runeId));
+        log.debug(String.format("calculateRuneValue runeId = %d", runeId));
         return itemManager.getItemPrice(runePouchEnum.getIntValue(runeId)) * runeQuantity;
     }
 
