@@ -195,7 +195,7 @@ public class ProfitTrackerPlugin extends Plugin
         else
         {
             /* first time calculation / banking / equipping */
-            log.info("Skipping profit calculation!");
+            log.debug("Skipping profit calculation!");
 
             skipTickForProfitCalculation = false;
 
@@ -216,7 +216,7 @@ public class ProfitTrackerPlugin extends Plugin
         this event tells us when inventory has changed
         and when banking/equipment event occured this tick
          */
-        log.info("onItemContainerChanged container id: " + event.getContainerId());
+        log.debug("onItemContainerChanged container id: " + event.getContainerId());
 
         int containerId = event.getContainerId();
 
@@ -246,8 +246,8 @@ public class ProfitTrackerPlugin extends Plugin
     @Subscribe
     public void onMenuOptionClicked(MenuOptionClicked event) {
         /* for ignoring deposit in deposit box */
-        log.info(String.format("Click! ID: %d ,menuOption: %s, menuTarget: %s",
-                event.getId(), event.getMenuOption(), event.getMenuTarget()));
+        log.debug(String.format("Click! ID: %d ,menuOption: %s, menuTarget: %s",
+                  event.getId(), event.getMenuOption(), event.getMenuTarget()));
 
         if (event.getId() == ObjectID.BANK_DEPOSIT_BOX) {
             // we've interacted with a deposit box. Don't take this tick into account for profit calculation

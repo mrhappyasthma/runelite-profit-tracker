@@ -57,7 +57,7 @@ public class ProfitTrackerInventoryValue {
         if (itemId < -1)
         {
             // unexpected
-            log.info("Bad item id!" + itemId);
+            log.debug("Bad item id!" + itemId);
             return 0;
 
         }
@@ -73,7 +73,7 @@ public class ProfitTrackerInventoryValue {
             return calculateRunePouchValue();
         }
 
-        log.info(String.format("calculateItemValue itemId = %d", itemId));
+        log.debug(String.format("calculateItemValue itemId = %d", itemId));
 
         // multiply quantity  by GE value
         return item.getQuantity() * (itemManager.getItemPrice(itemId));
