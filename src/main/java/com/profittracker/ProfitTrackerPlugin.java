@@ -249,8 +249,8 @@ public class ProfitTrackerPlugin extends Plugin
         log.debug(String.format("Click! ID: %d ,menuOption: %s, menuTarget: %s",
                   event.getId(), event.getMenuOption(), event.getMenuTarget()));
 
-        if (event.getId() == ObjectID.BANK_DEPOSIT_BOX) {
-            // we've interacted with a deposit box. Don't take this tick into account for profit calculation
+        if (event.getId() == ObjectID.BANK_DEPOSIT_BOX || event.getId() == ObjectID.DEPOSIT_POOL) {
+            // we've interacted with a deposit box/pool. Don't take this tick into account for profit calculation
             skipTickForProfitCalculation = true;
         }
 
