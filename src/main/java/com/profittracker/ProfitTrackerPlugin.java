@@ -261,7 +261,22 @@ public class ProfitTrackerPlugin extends Plugin
             skipTickForProfitCalculation = true;
         }
 
-
+        switch (event.getItemId()) {
+            case ItemID.PLANK_SACK:
+            case ItemID.FISH_SACK_BARREL:
+            case ItemID.FISH_BARREL:
+            case ItemID.COAL_BAG:
+            case ItemID.COLOSSAL_POUCH:
+            case ItemID.LARGE_POUCH:
+            case ItemID.MEDIUM_POUCH:
+            case ItemID.SMALL_POUCH:
+            case ItemID.FORESTRY_KIT:
+            case ItemID.FORESTRY_BASKET:
+                if (menuOption.equalsIgnoreCase("empty") || menuOption.equalsIgnoreCase("fill")){
+                    // Ignore manual changes to container items as the items have not been lost
+                    skipTickForProfitCalculation = true;
+                }
+        }
     }
 
     @Provides
