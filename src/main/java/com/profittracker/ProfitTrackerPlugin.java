@@ -248,9 +248,16 @@ public class ProfitTrackerPlugin extends Plugin
         /* for ignoring deposit in deposit box */
         log.debug(String.format("Click! ID: %d ,menuOption: %s, menuTarget: %s",
                   event.getId(), event.getMenuOption(), event.getMenuTarget()));
+        String menuOption = event.getMenuOption();
+        switch (event.getId()){
+            case ObjectID.BANK_DEPOSIT_BOX:
+            case ObjectID.DEPOSIT_POOL:
+                // we've interacted with a deposit box/pool. Don't take this tick into account for profit calculation
+                skipTickForProfitCalculation = true;
+        }
 
-        if (event.getId() == ObjectID.BANK_DEPOSIT_BOX || event.getId() == ObjectID.DEPOSIT_POOL) {
-            // we've interacted with a deposit box/pool. Don't take this tick into account for profit calculation
+        if (event.getId() == 1 && (menuOption.startsWith("Withdraw-") || menuOption.startsWith("Deposit-"))){
+            // Interacting with bank, because itemContainerChanged does not report bank change if closed on same tick
             skipTickForProfitCalculation = true;
         }
 
