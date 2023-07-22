@@ -242,22 +242,56 @@ public class ProfitTrackerGoldDrops {
 
     private String formatGoldDropText(long goldDropValue)
     {
-        // format gold value runescape style
-        // up to 10,000K
-        // I.E: 100,000 -> 100K
+        // Format gold value to fit in xp drop to avoid being cutoff by gold sprite
+        // 999
+        // 1.0K
+        // 20K
+        // 300K
+        // 1.0M
 
-        if (Math.abs(goldDropValue) < 10000L)
-        {
+        float goldValueRep = goldDropValue;
+        String suffix = "";
+        boolean useDecimal = false;
+        if (Math.abs(goldDropValue) < 1000L) { // 1-999
             return Long.toString(goldDropValue);
         }
-        else if (Math.abs(goldDropValue) < 1000L * 1000L)
+        else if (Math.abs(goldDropValue) < 10000L) // 1,000-9,999
         {
-            return (goldDropValue / 1000) + "K";
+            goldValueRep = (goldDropValue / 1000.0F);
+            suffix = "K";
+            useDecimal = true;
+        }
+        else if (Math.abs(goldDropValue) < 1000000L) // 10,000-999,999
+        {
+            goldValueRep = (goldDropValue / 1000.0F);
+            suffix = "K";
+        }
+        else if (Math.abs(goldDropValue) < 10000000L) // 1,000,000-9,999,999
+        {
+            goldValueRep = (goldDropValue / 1000000.0F);
+            suffix = "M";
+            useDecimal = true;
+        }
+        else if (Math.abs(goldDropValue) < 1000000000L) // 10,000,000-999,999,999
+        {
+            goldValueRep = (goldDropValue / 1000000.0F);
+            suffix = "M";
+        }
+        else if (Math.abs(goldDropValue) < 1000000000000L) // 1,000,000,000+
+        {
+            goldValueRep = (goldDropValue / 1000000000.0F);
+            suffix = "B";
+            useDecimal = true;
         }
         else
         {
             return "ALOT";
         }
-
+        if(useDecimal)
+        {
+            return String.format("%.1f%s", goldValueRep, suffix);
+        }else{
+            return String.format("%.0f%s", goldValueRep, suffix);
+        }
     }
 }
