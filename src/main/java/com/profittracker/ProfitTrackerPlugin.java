@@ -260,6 +260,10 @@ public class ProfitTrackerPlugin extends Plugin
             // Interacting with bank, because itemContainerChanged does not report bank change if closed on same tick
             skipTickForProfitCalculation = true;
         }
+        if (event.getId() == ObjectID.BANK_DEPOSIT_BOX || event.getId() == ObjectID.DEPOSIT_POOL || event.getId() == ObjectID.BANK_DEPOSIT_CHEST) {
+            // we've interacted with a deposit box/pool. Don't take this tick into account for profit calculation
+            skipTickForProfitCalculation = true;
+        }
 
         switch (event.getItemId()) {
             case ItemID.PLANK_SACK:
