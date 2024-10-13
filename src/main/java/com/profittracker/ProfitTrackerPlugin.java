@@ -289,20 +289,63 @@ public class ProfitTrackerPlugin extends Plugin
             skipTickForProfitCalculation = true;
         }
 
+        // Ignore losses incurred by filling container items that are only empty-able to the bank
         switch (event.getItemId()) {
-            case ItemID.PLANK_SACK:
+            case ItemID.PLANK_SACK: // Fill, empty | use (dumps into inventory)
+                // Items can be used directly from sack
+                // Filling sack requires inventory as intermediate
             case ItemID.FISH_SACK_BARREL:
-            case ItemID.FISH_BARREL:
-            case ItemID.COAL_BAG:
-            case ItemID.COLOSSAL_POUCH:
+            case ItemID.FISH_BARREL: //Fill, open | empty
+
+            case ItemID.BRONZE_COFFIN: // Fill, configure, open
+            case ItemID.BLACK_COFFIN:
+            case ItemID.STEEL_COFFIN:
+            case ItemID.SILVER_COFFIN:
+            case ItemID.GOLD_COFFIN:
+
+            case ItemID.GEM_BAG: //Fill, empty, open | empty
+            case ItemID.COAL_BAG: // Fill, empty, open | fill, empty
+                //Coal can be directly used from the sack, and be filled directly from bank
+
+            case ItemID.COLOSSAL_POUCH: // Fill, empty | fill, empty
+            case ItemID.GIANT_POUCH:
             case ItemID.LARGE_POUCH:
             case ItemID.MEDIUM_POUCH:
             case ItemID.SMALL_POUCH:
-            case ItemID.FORESTRY_KIT:
-            case ItemID.FORESTRY_BASKET:
-                if (menuOption.equalsIgnoreCase("empty") || menuOption.equalsIgnoreCase("fill")){
-                    // Ignore manual changes to container items as the items have not been lost
-                    skipTickForProfitCalculation = true;
+
+            // case ItemID.BASKET: //Fill, remove-one, empty | fill | basket turns into different name like "Bananas(#)"
+                //Empty sack
+            case ItemID.BOLT_POUCH: //Open(remove interface) | | bolts can be worn via armor interface extra ammo slot
+            case ItemID.HERB_SACK: // Fill, empty, open | empty
+                //Looting bag
+                //Rune pouch // Covered by withdraw interface
+            case ItemID.SEED_BOX: // Open
+            case ItemID.STEEL_KEY_RING: //Add keys via use on ring | remove via remove interface
+                //Flamtaer bag // Fill, empty | empty (dumps into inventory) | items can be used directly from sack
+                //Tackle box
+            case ItemID.MASTER_SCROLL_BOOK: // Interface with remove option | items can be used from book via activate and teleport
+                //Gnomish firelighter // Check, uncharge
+
+            case ItemID.LOG_BASKET: // Fill, Check(dialog based withdraw), Close/Open | Empty
+            case ItemID.FORESTRY_KIT: // View(kit has withdraw interface), Fill | Use(dumps to bank)
+            case ItemID.FORESTRY_BASKET: // Fill, view(kit has withdraw interface/basket has none) | use (dumps to bank)
+
+            case ItemID.SMALL_MEAT_POUCH: // Fill, Empty
+            case ItemID.LARGE_MEAT_POUCH: // Fill, Empty
+            case ItemID.SMALL_FUR_POUCH: // Fill, Empty
+            case ItemID.MEDIUM_FUR_POUCH: // Fill, Empty
+            case ItemID.LARGE_FUR_POUCH: // Fill, Empty
+
+            case ItemID.REAGENT_POUCH: // ??? | Use (dumps to bank)
+                switch (menuOption.toLowerCase()) {
+                    case "empty":
+                    case "fill":
+                    case "use":
+                        log.debug("Ignoring storage item interaction.");
+                        // Ignore manual changes to container items as the items have not been lost
+                        skipTickForProfitCalculation = true;
+                }
+                break;
                 }
         }
     }
