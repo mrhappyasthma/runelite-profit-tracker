@@ -273,20 +273,15 @@ public class ProfitTrackerPlugin extends Plugin
         log.debug(String.format("Click! ID: %d ,menuOption: %s, menuTarget: %s",
                   event.getId(), event.getMenuOption(), event.getMenuTarget()));
         String menuOption = event.getMenuOption();
-        switch (event.getId()){
-            case ObjectID.BANK_DEPOSIT_BOX:
-            case ObjectID.DEPOSIT_POOL:
-                // we've interacted with a deposit box/pool. Don't take this tick into account for profit calculation
-                skipTickForProfitCalculation = true;
-        }
 
-        if (event.getId() == 1 && (menuOption.startsWith("Withdraw-") || menuOption.startsWith("Deposit-"))){
-            // Interacting with bank, because itemContainerChanged does not report bank change if closed on same tick
-            skipTickForProfitCalculation = true;
-        }
-        if (event.getId() == ObjectID.BANK_DEPOSIT_BOX || event.getId() == ObjectID.DEPOSIT_POOL || event.getId() == ObjectID.BANK_DEPOSIT_CHEST) {
-            // we've interacted with a deposit box/pool. Don't take this tick into account for profit calculation
-            skipTickForProfitCalculation = true;
+        String containerMenuOptions[] = {"Deposit","Empty"};
+        for (int i = 0; i < containerMenuOptions.length; i++){
+            if (menuOption.startsWith(containerMenuOptions[i])){
+                // Backup catch for various bank interfaces to deposit or empty sacks
+                // Event object does not seem to provide information that would otherwise tell us it's a bank
+                skipTickForProfitCalculation = true;
+                break;
+            }
         }
 
         // Ignore losses incurred by filling container items that are only empty-able to the bank
