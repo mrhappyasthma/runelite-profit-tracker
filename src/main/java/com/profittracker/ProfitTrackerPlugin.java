@@ -7,6 +7,7 @@ import net.runelite.api.*;
 
 import net.runelite.api.events.*;
 
+import net.runelite.api.widgets.WidgetID;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.ItemManager;
@@ -36,6 +37,8 @@ public class ProfitTrackerPlugin extends Plugin
     private boolean inventoryValueChanged;
     private boolean inProfitTrackSession;
     private boolean runePouchContentsChanged;
+    //Remembers if the bank was open last tick, because tick perfect bank close reports changes late
+    private boolean bankJustClosed;
     private int[] RUNE_POUCH_VARBITS = {
             Varbits.RUNE_POUCH_AMOUNT1,
             Varbits.RUNE_POUCH_AMOUNT2,
@@ -151,8 +154,19 @@ public class ProfitTrackerPlugin extends Plugin
             return;
         }
 
+        boolean skipOnce = false;
+        if (bankJustClosed) {
+            // Interacting with bank
+            // itemContainerChanged does not report bank change if closed on same tick
+            skipOnce = true;
+        }
+        bankJustClosed = false;
+
         if (inventoryValueChanged || runePouchContentsChanged)
         {
+            if (skipOnce) {
+                skipTickForProfitCalculation = true;
+            }
             tickProfit = calculateTickProfit();
 
             // accumulate profit
@@ -171,6 +185,16 @@ public class ProfitTrackerPlugin extends Plugin
         }
 
     }
+
+    @Subscribe
+    public void onWidgetClosed(WidgetClosed event)
+    {
+        //Catch bank closing, as tick perfect close can cause onItemContainerChanged to not think it is in the bank
+        if (event.getGroupId() == WidgetID.BANK_GROUP_ID || event.getGroupId() == WidgetID.BANK_INVENTORY_GROUP_ID) {
+            bankJustClosed = true;
+        }
+    }
+
 
     private long calculateTickProfit()
     {
