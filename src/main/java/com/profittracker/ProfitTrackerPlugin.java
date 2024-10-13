@@ -346,7 +346,39 @@ public class ProfitTrackerPlugin extends Plugin
                         skipTickForProfitCalculation = true;
                 }
                 break;
+            // Don't ignore open containers, as items added directly to them don't get recorded
+            case ItemID.OPEN_FISH_SACK_BARREL:
+            case ItemID.OPEN_FISH_BARREL:
+            case ItemID.OPEN_BRONZE_COFFIN: // Fill, configure, open
+            case ItemID.OPEN_BLACK_COFFIN:
+            case ItemID.OPEN_STEEL_COFFIN:
+            case ItemID.OPEN_SILVER_COFFIN:
+            case ItemID.OPEN_GOLD_COFFIN:
+
+            case ItemID.OPEN_GEM_BAG:
+            case ItemID.OPEN_COAL_BAG:
+
+            case ItemID.OPEN_HERB_SACK:
+            case ItemID.OPEN_LOG_BASKET:
+            case ItemID.OPEN_FORESTRY_BASKET:
+
+            case ItemID.SMALL_MEAT_POUCH_OPEN: // Fill, Empty
+            case ItemID.LARGE_MEAT_POUCH_OPEN: // Fill, Empty
+            case ItemID.SMALL_FUR_POUCH_OPEN: // Fill, Empty
+            case ItemID.MEDIUM_FUR_POUCH_OPEN: // Fill, Empty
+            case ItemID.LARGE_FUR_POUCH_OPEN: // Fill, Empty
+
+            case ItemID.OPEN_REAGENT_POUCH:
+                switch (menuOption.toLowerCase()) {
+                    // Empty is not ignored, as we want an option to calculate profit for unrecorded items that
+                    // were sucked into the container directly
+                    case "fill":
+                    case "use":
+                        log.debug("Ignoring open storage item interaction.");
+                        // Ignore manual changes to container items as the items have not been lost
+                        skipTickForProfitCalculation = true;
                 }
+                break;
         }
     }
 
