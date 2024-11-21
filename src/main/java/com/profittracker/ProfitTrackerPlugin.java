@@ -265,6 +265,9 @@ public class ProfitTrackerPlugin extends Plugin
     public void onVarbitChanged(VarbitChanged event)
     {
         runePouchContentsChanged = Arrays.stream(RUNE_POUCH_VARBITS).anyMatch(vb -> event.getVarbitId() == vb);
+        if (Arrays.stream(RUNE_POUCH_VARBITS).anyMatch(vb -> event.getVarbitId() == vb)){
+            runePouchContentsChanged = true;
+        }
     }
 
     @Subscribe
