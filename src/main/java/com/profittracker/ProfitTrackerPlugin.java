@@ -29,16 +29,25 @@ public class ProfitTrackerPlugin extends Plugin
 
     // the profit will be calculated against this value
     private long prevInventoryValue;
+    // Collection of items that was last used to calculate value, includes inventory and equipment
+    private Item[] prevInventoryItems;
+    private Item[] prevBankItems;
     private long totalProfit;
 
     private long startTickMillis;
 
     private boolean skipTickForProfitCalculation;
     private boolean inventoryValueChanged;
+    private boolean bankValueChanged;
     private boolean inProfitTrackSession;
     private boolean runePouchContentsChanged;
-    //Remembers if the bank was open last tick, because tick perfect bank close reports changes late
+    // Remembers if the bank was open last tick, because tick perfect bank close reports changes late
     private boolean bankJustClosed;
+    // Set when using a deposit menu option. Used to create a depositing deficit for the next time you open bank
+    // This ensures using a deposit box doesn't spam coin drops, but also doesn't get out of sync when the race
+    // condition with menu options and container changes causes some anyways
+    private boolean depositingItem;
+    private int depositDeficit;
     private int[] RUNE_POUCH_VARBITS = {
             Varbits.RUNE_POUCH_AMOUNT1,
             Varbits.RUNE_POUCH_AMOUNT2,
@@ -101,10 +110,17 @@ public class ProfitTrackerPlugin extends Plugin
 
         inventoryValueChanged = false;
 
+        bankValueChanged = false;
+
         inProfitTrackSession = false;
 
         runePouchContentsChanged = false;
 
+        bankJustClosed = false;
+
+        depositingItem = false;
+
+        depositDeficit = 0;
     }
 
     private void startProfitTrackingSession()
@@ -134,7 +150,7 @@ public class ProfitTrackerPlugin extends Plugin
     }
 
     @Subscribe
-    public void onGameTick(GameTick gameTick)
+    public void onGameTick(GameTick gameTick) throws Exception
     {
         /*
         Main plugin logic here
@@ -151,7 +167,12 @@ public class ProfitTrackerPlugin extends Plugin
 
         if (!inProfitTrackSession)
         {
-            return;
+            if (config.autoStart()){
+                startUp();
+                inventoryValueChanged = true;
+            } else {
+                return;
+            }
         }
 
         boolean skipOnce = false;
@@ -162,7 +183,7 @@ public class ProfitTrackerPlugin extends Plugin
         }
         bankJustClosed = false;
 
-        if (inventoryValueChanged || runePouchContentsChanged)
+        if (inventoryValueChanged || runePouchContentsChanged || bankValueChanged)
         {
             if (skipOnce) {
                 skipTickForProfitCalculation = true;
@@ -170,8 +191,20 @@ public class ProfitTrackerPlugin extends Plugin
             tickProfit = calculateTickProfit();
 
             // accumulate profit
-            totalProfit += tickProfit;
+            if (depositingItem){
+                // Track a deficit for deposits because of deposit box problems
+                depositDeficit += tickProfit;
+                depositingItem = false;
+                tickProfit = 0;
+            }
 
+            // Resync with untracked changes from using deposit box
+            if (bankValueChanged) {
+                tickProfit += depositDeficit;
+                depositDeficit = 0;
+            }
+
+            totalProfit += tickProfit;
             overlay.updateProfitValue(totalProfit);
 
             // generate gold drop
@@ -181,16 +214,18 @@ public class ProfitTrackerPlugin extends Plugin
             }
 
             inventoryValueChanged = false;
+            bankValueChanged = false;
             runePouchContentsChanged = false;
         }
-
     }
 
     @Subscribe
     public void onWidgetClosed(WidgetClosed event)
     {
         //Catch bank closing, as tick perfect close can cause onItemContainerChanged to not think it is in the bank
-        if (event.getGroupId() == WidgetID.BANK_GROUP_ID || event.getGroupId() == WidgetID.BANK_INVENTORY_GROUP_ID) {
+        if (event.getGroupId() == WidgetID.BANK_GROUP_ID ||
+            event.getGroupId() == WidgetID.BANK_INVENTORY_GROUP_ID ||
+            event.getGroupId() == 871) { //Huntsman's kit
             bankJustClosed = true;
         }
     }
@@ -205,16 +240,28 @@ public class ProfitTrackerPlugin extends Plugin
 
          */
         long newInventoryValue;
+        Item[] newInventoryItems;
+        Item[] newBankItems;
         long newProfit;
+        Item[] inventoryDif;
+        Item[] bankDif = new Item[0];
 
         // calculate current inventory value
-        newInventoryValue = inventoryValueObject.calculateInventoryAndEquipmentValue();
+        //newInventoryValue = inventoryValueObject.calculateInventoryAndEquipmentValue();
+        newInventoryItems = inventoryValueObject.getInventoryAndEquipmentContents();
+        newBankItems = inventoryValueObject.getBankContents();
 
-        if (!skipTickForProfitCalculation)
+        if (!skipTickForProfitCalculation && prevInventoryItems != null)
         {
             // calculate new profit
-            newProfit = newInventoryValue - prevInventoryValue;
-
+            // newProfit = newInventoryValue - prevInventoryValue;
+            inventoryDif = inventoryValueObject.getItemCollectionDif(prevInventoryItems,newInventoryItems);
+            newProfit = inventoryValueObject.calculateItemValue(inventoryDif);
+            if (prevBankItems != null && newBankItems != null) {
+                bankDif = inventoryValueObject.getItemCollectionDif(prevBankItems,newBankItems);
+                newProfit += inventoryValueObject.calculateItemValue(bankDif);
+            }
+            log.debug("Calculated profit for " + inventoryDif.length + bankDif.length + " item changes.");
         }
         else
         {
@@ -228,7 +275,15 @@ public class ProfitTrackerPlugin extends Plugin
         }
 
         // update prevInventoryValue for future calculations anyway!
-        prevInventoryValue = newInventoryValue;
+        //prevInventoryValue = newInventoryValue;
+        prevInventoryItems = newInventoryItems;
+        if (newBankItems != null) {
+            if (prevBankItems == null) {
+                // If user hasn't opened bank yet, the deficit doesn't help us resync
+                depositDeficit = 0;
+            }
+            prevBankItems = newBankItems;
+        }
 
         return newProfit;
     }
@@ -248,23 +303,22 @@ public class ProfitTrackerPlugin extends Plugin
             containerId == InventoryID.EQUIPMENT.getId()) {
             // inventory has changed - need calculate profit in onGameTick
             inventoryValueChanged = true;
-
         }
 
-        // in these events, inventory WILL be changed but we DON'T want to calculate profit!
-        if(     containerId == InventoryID.BANK.getId()) {
-            // this is a bank interaction.
-            // Don't take this into account
+        if( containerId == InventoryID.BANK.getId()) {
+            bankValueChanged = true;
+        }
+
+        // In these events, inventory WILL be changed, but we DON'T want to calculate profit!
+        if( containerId == 855 || // Huntsman's kit
+            containerId == InventoryID.SEED_VAULT.getId()) { // Seed vault
             skipTickForProfitCalculation = true;
-
         }
-
     }
 
     @Subscribe
     public void onVarbitChanged(VarbitChanged event)
     {
-        runePouchContentsChanged = Arrays.stream(RUNE_POUCH_VARBITS).anyMatch(vb -> event.getVarbitId() == vb);
         if (Arrays.stream(RUNE_POUCH_VARBITS).anyMatch(vb -> event.getVarbitId() == vb)){
             runePouchContentsChanged = true;
         }
@@ -277,18 +331,33 @@ public class ProfitTrackerPlugin extends Plugin
                   event.getId(), event.getMenuOption(), event.getMenuTarget()));
         String menuOption = event.getMenuOption();
 
-        String containerMenuOptions[] = {"Deposit","Empty"};
+        String containerMenuOptions[] = {"Deposit-"};
         for (int i = 0; i < containerMenuOptions.length; i++){
             if (menuOption.startsWith(containerMenuOptions[i])){
-                // Backup catch for various bank interfaces to deposit or empty sacks
+                // Backup catch for various bank interfaces to deposit items
                 // Event object does not seem to provide information that would otherwise tell us it's a bank
-                skipTickForProfitCalculation = true;
+                // Still, it is possible to have game tick happen before a container changes to reflect menu option,
+                // which can cause unexpected profit/loss, particularly when clicking a lot in a deposit box.
+                depositingItem = true;
                 break;
             }
         }
 
-        // Ignore losses incurred by filling container items that are only empty-able to the bank
+        // Container items
         switch (event.getItemId()) {
+            case ItemID.HUNTSMANS_KIT: //Fill, Empty, view(custom storage interface)
+            case ItemID.TACKLE_BOX:
+                switch (menuOption.toLowerCase()) {
+                    // These items act as long term storage, and are more like banks
+                    // Items are not used directly from them either
+                    case "empty":
+                    case "fill":
+                    case "use":
+                        log.debug("Ignoring storage item interaction.");
+                        // Ignore manual changes to container items as the items have not been lost
+                        skipTickForProfitCalculation = true;
+                }
+                break;
             case ItemID.PLANK_SACK: // Fill, empty | use (dumps into inventory)
                 // Items can be used directly from sack
                 // Filling sack requires inventory as intermediate
@@ -333,17 +402,7 @@ public class ProfitTrackerPlugin extends Plugin
             case ItemID.SMALL_FUR_POUCH: // Fill, Empty
             case ItemID.MEDIUM_FUR_POUCH: // Fill, Empty
             case ItemID.LARGE_FUR_POUCH: // Fill, Empty
-
             case ItemID.REAGENT_POUCH: // ??? | Use (dumps to bank)
-                switch (menuOption.toLowerCase()) {
-                    case "empty":
-                    case "fill":
-                    case "use":
-                        log.debug("Ignoring storage item interaction.");
-                        // Ignore manual changes to container items as the items have not been lost
-                        skipTickForProfitCalculation = true;
-                }
-                break;
             // Don't ignore open containers, as items added directly to them don't get recorded
             case ItemID.OPEN_FISH_SACK_BARREL:
             case ItemID.OPEN_FISH_BARREL:
@@ -368,13 +427,14 @@ public class ProfitTrackerPlugin extends Plugin
 
             case ItemID.OPEN_REAGENT_POUCH:
                 switch (menuOption.toLowerCase()) {
-                    // Empty is not ignored, as we want an option to calculate profit for unrecorded items that
-                    // were sucked into the container directly
+                    // Interacting with these things pulls items from volatile unrecorded space
+                    // Coal bag could be filled from bank to use in smithing, or filled from mining
+                    // Price needs to be recorded while banking or otherwise
+                    case "empty":
                     case "fill":
                     case "use":
-                        log.debug("Ignoring open storage item interaction.");
-                        // Ignore manual changes to container items as the items have not been lost
-                        skipTickForProfitCalculation = true;
+                        // Ensure item containers
+                        skipTickForProfitCalculation = false;
                 }
                 break;
         }
