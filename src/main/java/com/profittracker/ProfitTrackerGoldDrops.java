@@ -289,9 +289,9 @@ public class ProfitTrackerGoldDrops {
         }
         if(useDecimal)
         {
-            return String.format("%.1f%s", goldValueRep, suffix);
+            return String.format("%.1f%s", Math.floor(goldValueRep * 10) / 10, suffix);
         }else{
-            return String.format("%.0f%s", goldValueRep, suffix);
+            return String.format("%.0f%s", Math.floor(goldValueRep * 10) / 10, suffix);
         }
     }
 }
