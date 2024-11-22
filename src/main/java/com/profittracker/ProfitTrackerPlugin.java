@@ -222,10 +222,6 @@ public class ProfitTrackerPlugin extends Plugin
     @Subscribe
     public void onWidgetClosed(WidgetClosed event)
     {
-        //Catch bank closing, as tick perfect close can cause onItemContainerChanged to not think it is in the bank
-        if (event.getGroupId() == WidgetID.BANK_GROUP_ID ||
-            event.getGroupId() == WidgetID.BANK_INVENTORY_GROUP_ID ||
-            event.getGroupId() == 871) { //Huntsman's kit
         //Catch untracked storage closing, as tick perfect close can cause onItemContainerChanged to not see the change
         if (event.getGroupId() == 871 || //Huntsman's kit
             event.getGroupId() == WidgetID.SEED_VAULT_GROUP_ID) { // Seed vault
