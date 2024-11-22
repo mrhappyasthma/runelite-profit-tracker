@@ -226,6 +226,9 @@ public class ProfitTrackerPlugin extends Plugin
         if (event.getGroupId() == WidgetID.BANK_GROUP_ID ||
             event.getGroupId() == WidgetID.BANK_INVENTORY_GROUP_ID ||
             event.getGroupId() == 871) { //Huntsman's kit
+        //Catch untracked storage closing, as tick perfect close can cause onItemContainerChanged to not see the change
+        if (event.getGroupId() == 871 || //Huntsman's kit
+            event.getGroupId() == WidgetID.SEED_VAULT_GROUP_ID) { // Seed vault
             bankJustClosed = true;
         }
     }
