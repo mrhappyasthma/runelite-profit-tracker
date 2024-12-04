@@ -228,37 +228,37 @@ public class ProfitTrackerInventoryValue {
      * @param newItems
      * @return
      */
-    public Item[] getItemCollectionDif(Item[] originalItems, Item[] newItems){
+    public Item[] getItemCollectionDifference(Item[] originalItems, Item[] newItems){
         //Iterate over each item, finding any instances of its existence from before
         Item[] negativeItems = originalItems.clone();
         for (int i = 0; i < originalItems.length; i++){
             negativeItems[i] = new Item(originalItems[i].getId(),-originalItems[i].getQuantity());
         }
-        Item[] itemIntermediateDif = ArrayUtils.addAll(negativeItems,newItems);
+        Item[] itemIntermediateDifference = ArrayUtils.addAll(negativeItems,newItems);
 
         //Create a nicer looking item list with only the actual changes
-        HashMap<Integer, Integer> itemDifHash = new HashMap<>();
+        HashMap<Integer, Integer> itemDifferenceHash = new HashMap<>();
 
-        for (int i = 0; i < itemIntermediateDif.length; i++){
-            int itemID = itemIntermediateDif[i].getId();
-            itemDifHash.putIfAbsent(itemID, 0);
-            itemDifHash.put(itemID, itemDifHash.get(itemID) + itemIntermediateDif[i].getQuantity());
+        for (int i = 0; i < itemIntermediateDifference.length; i++){
+            int itemID = itemIntermediateDifference[i].getId();
+            itemDifferenceHash.putIfAbsent(itemID, 0);
+            itemDifferenceHash.put(itemID, itemDifferenceHash.get(itemID) + itemIntermediateDifference[i].getQuantity());
         }
 
-        Iterator mapIt = itemDifHash.entrySet().iterator();
+        Iterator mapIt = itemDifferenceHash.entrySet().iterator();
         while (mapIt.hasNext()){
             Map.Entry pair = (Map.Entry)mapIt.next();
             if ((Integer)(pair.getValue()) == 0){
                 mapIt.remove();
             }
         }
-        List<Item> itemDif = new ArrayList<>();
-        mapIt = itemDifHash.entrySet().iterator();
+        List<Item> itemDifference = new ArrayList<>();
+        mapIt = itemDifferenceHash.entrySet().iterator();
         while (mapIt.hasNext()){
             Map.Entry pair = (Map.Entry)mapIt.next();
-            itemDif.add(new Item((Integer)pair.getKey(),(Integer)pair.getValue()));
+            itemDifference.add(new Item((Integer)pair.getKey(),(Integer)pair.getValue()));
         }
 
-        return itemDif.toArray(new Item[0]);
+        return itemDifference.toArray(new Item[0]);
     }
 }
