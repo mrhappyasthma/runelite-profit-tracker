@@ -15,6 +15,7 @@ import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.api.events.VarbitChanged;
+import org.apache.commons.lang3.ArrayUtils;
 
 import java.util.Arrays;
 
@@ -96,8 +97,8 @@ public class ProfitTrackerPlugin extends Plugin
 
     private void initializeVariables()
     {
-        // value here doesn't matter, will be overwritten
-        prevInventoryValue = -1;
+        prevInventoryItems = null;
+        prevBankItems = null;
 
         // profit begins at 0 of course
         totalProfit = 0;
@@ -242,8 +243,8 @@ public class ProfitTrackerPlugin extends Plugin
         Item[] newInventoryItems;
         Item[] newBankItems;
         long newProfit;
-        Item[] inventoryDif;
-        Item[] bankDif = new Item[0];
+        Item[] inventoryDifference;
+        Item[] bankDifference = new Item[0];
 
         // calculate current inventory value
         //newInventoryValue = inventoryValueObject.calculateInventoryAndEquipmentValue();
@@ -254,13 +255,16 @@ public class ProfitTrackerPlugin extends Plugin
         {
             // calculate new profit
             // newProfit = newInventoryValue - prevInventoryValue;
-            inventoryDif = inventoryValueObject.getItemCollectionDifference(prevInventoryItems,newInventoryItems);
-            newProfit = inventoryValueObject.calculateItemValue(inventoryDif);
+            inventoryDifference = inventoryValueObject.getItemCollectionDifference(prevInventoryItems,newInventoryItems);
+            newProfit = inventoryValueObject.calculateItemValue(inventoryDifference);
             if (prevBankItems != null && newBankItems != null) {
-                bankDif = inventoryValueObject.getItemCollectionDifference(prevBankItems,newBankItems);
-                newProfit += inventoryValueObject.calculateItemValue(bankDif);
+                bankDifference = inventoryValueObject.getItemCollectionDifference(prevBankItems,newBankItems);
+                // Profit is recalculated on all items instead of summed just in case item values could change between calculations
+                Item[] inventoryAndBankDifference = ArrayUtils.addAll(inventoryDifference,bankDifference);
+                newProfit = inventoryValueObject.calculateItemValue(inventoryAndBankDifference);
             }
-            log.debug("Calculated profit for " + inventoryDif.length + bankDif.length + " item changes.");
+
+            log.debug("Calculated " + newProfit + " profit for " + (inventoryDifference.length + bankDifference.length) + " item changes.");
         }
         else
         {
