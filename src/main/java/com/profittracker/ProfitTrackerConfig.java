@@ -20,5 +20,15 @@ public interface ProfitTrackerConfig extends Config
     {
         return true;
     }
+
+    @ConfigItem(
+            keyName = "autoStart",
+            name = "Automatically start tracking",
+            description = "Automatically begin tracking profit on session start."
+    )
+    default boolean autoStart()
+    {
+        return true;
+    }
 }
 
