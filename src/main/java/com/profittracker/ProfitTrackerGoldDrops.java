@@ -3,6 +3,7 @@ package com.profittracker;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.api.events.ScriptPreFired;
+import net.runelite.api.widgets.InterfaceID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.util.AsyncBufferedImage;
@@ -12,8 +13,6 @@ import java.awt.*;
 
 import static net.runelite.api.ScriptID.XPDROPS_SETDROPSIZE;
 import static net.runelite.api.ScriptID.XPDROP_DISABLED;
-import static net.runelite.api.widgets.WidgetInfo.TO_CHILD;
-import static net.runelite.api.widgets.WidgetInfo.TO_GROUP;
 
 @Slf4j
 public class ProfitTrackerGoldDrops {
@@ -116,7 +115,7 @@ public class ProfitTrackerGoldDrops {
         Widget[] xpDropWidgetChildren;
 
         // get widget from ID
-        xpDropWidget = client.getWidget(TO_GROUP(xpDropWidgetId), TO_CHILD(xpDropWidgetId));
+        xpDropWidget = client.getWidget(InterfaceID.EXPERIENCE_TRACKER, xpDropWidgetId & 0xFFFF);
 
         if (xpDropWidget == null)
         {
