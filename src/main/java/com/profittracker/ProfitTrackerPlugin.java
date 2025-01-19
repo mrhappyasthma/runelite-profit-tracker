@@ -7,7 +7,7 @@ import net.runelite.api.*;
 
 import net.runelite.api.events.*;
 
-import net.runelite.api.widgets.WidgetID;
+import net.runelite.api.widgets.InterfaceID;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.ItemManager;
@@ -225,7 +225,7 @@ public class ProfitTrackerPlugin extends Plugin
     {
         //Catch untracked storage closing, as tick perfect close can cause onItemContainerChanged to not see the change
         if (event.getGroupId() == 871 || //Huntsman's kit
-            event.getGroupId() == WidgetID.SEED_VAULT_GROUP_ID) { // Seed vault
+            event.getGroupId() == InterfaceID.SEED_VAULT) { // Seed vault
             bankJustClosed = true;
         }
     }
