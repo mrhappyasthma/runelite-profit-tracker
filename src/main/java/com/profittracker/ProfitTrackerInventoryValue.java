@@ -6,6 +6,7 @@ import net.runelite.client.game.ItemManager;
 import org.apache.commons.lang3.ArrayUtils;
 
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
 @Slf4j
@@ -222,6 +223,17 @@ public class ProfitTrackerInventoryValue {
     }
 
     /**
+     * Converts the given item array into a map
+     * @param items
+     * @return Map of item ID -> QTY
+     */
+    private Map<Integer, Integer> mapItemArray(Item[] items){
+        return Arrays.stream(items)
+                .filter((item) -> item.getQuantity() > 0)
+                .collect(Collectors.toMap(Item::getId, Item::getQuantity, Integer::sum));
+    }
+
+    /**
      * Compares the two arrays, returning an array of item differences
      * For example, dropping a shark would be an array of 1 shark item, with quantity -1
      * @param originalItems
@@ -229,35 +241,18 @@ public class ProfitTrackerInventoryValue {
      * @return
      */
     public Item[] getItemCollectionDifference(Item[] originalItems, Item[] newItems){
-        //Iterate over each item, finding any instances of its existence from before
-        Item[] negativeItems = originalItems.clone();
-        for (int i = 0; i < originalItems.length; i++){
-            negativeItems[i] = new Item(originalItems[i].getId(),-originalItems[i].getQuantity());
-        }
-        Item[] itemIntermediateDifference = ArrayUtils.addAll(negativeItems,newItems);
+        Map<Integer, Integer> originalItemList = mapItemArray(originalItems);
+        Map<Integer, Integer> newItemList = mapItemArray(newItems);
+        //Subtract old quantities from new to get difference
+        originalItemList.forEach((id, quantity) -> newItemList.merge(id, -quantity,(a,b)-> {
+            int sum = a + b;
+            //Returning null for merge removes the entry
+            return sum != 0 ? sum : null;
+        }));
 
-        //Create a nicer looking item list with only the actual changes
-        HashMap<Integer, Integer> itemDifferenceHash = new HashMap<>();
-
-        for (int i = 0; i < itemIntermediateDifference.length; i++){
-            int itemID = itemIntermediateDifference[i].getId();
-            itemDifferenceHash.putIfAbsent(itemID, 0);
-            itemDifferenceHash.put(itemID, itemDifferenceHash.get(itemID) + itemIntermediateDifference[i].getQuantity());
-        }
-
-        Iterator mapIt = itemDifferenceHash.entrySet().iterator();
-        while (mapIt.hasNext()){
-            Map.Entry pair = (Map.Entry)mapIt.next();
-            if ((Integer)(pair.getValue()) == 0){
-                mapIt.remove();
-            }
-        }
+        //Convert back to item array
         List<Item> itemDifference = new ArrayList<>();
-        mapIt = itemDifferenceHash.entrySet().iterator();
-        while (mapIt.hasNext()){
-            Map.Entry pair = (Map.Entry)mapIt.next();
-            itemDifference.add(new Item((Integer)pair.getKey(),(Integer)pair.getValue()));
-        }
+        newItemList.forEach((id, quantity) -> itemDifference.add(new Item(id,quantity)));
 
         return itemDifference.toArray(new Item[0]);
     }
