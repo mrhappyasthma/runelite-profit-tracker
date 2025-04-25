@@ -4,6 +4,9 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.client.game.ItemManager;
 import org.apache.commons.lang3.ArrayUtils;
+import net.runelite.api.gameval.ItemID;
+import net.runelite.api.gameval.VarbitID;
+import net.runelite.api.gameval.InventoryID;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -21,24 +24,24 @@ public class ProfitTrackerInventoryValue {
     static final int EMPTY_SLOT_ITEMID = -1;
 
     private final int[] RUNE_POUCH_ITEM_IDS = {
-            ItemID.RUNE_POUCH,
-            ItemID.RUNE_POUCH_L,
+            ItemID.BH_RUNE_POUCH,
+            ItemID.BH_RUNE_POUCH_TROUVER,
             ItemID.DIVINE_RUNE_POUCH,
-            ItemID.DIVINE_RUNE_POUCH_L
+            ItemID.DIVINE_RUNE_POUCH_TROUVER
     };
 
     private final int[] RUNE_POUCH_AMOUNT_VARBITS = {
-            Varbits.RUNE_POUCH_AMOUNT1,
-            Varbits.RUNE_POUCH_AMOUNT2,
-            Varbits.RUNE_POUCH_AMOUNT3,
-            Varbits.RUNE_POUCH_AMOUNT4
+            VarbitID.RUNE_POUCH_QUANTITY_1,
+            VarbitID.RUNE_POUCH_QUANTITY_2,
+            VarbitID.RUNE_POUCH_QUANTITY_3,
+            VarbitID.RUNE_POUCH_QUANTITY_4
     };
 
     private final int[] RUNE_POUCH_RUNE_VARBITS = {
-            Varbits.RUNE_POUCH_RUNE1,
-            Varbits.RUNE_POUCH_RUNE2,
-            Varbits.RUNE_POUCH_RUNE3,
-            Varbits.RUNE_POUCH_RUNE4
+            VarbitID.RUNE_POUCH_TYPE_1,
+            VarbitID.RUNE_POUCH_TYPE_2,
+            VarbitID.RUNE_POUCH_TYPE_3,
+            VarbitID.RUNE_POUCH_TYPE_4
     };
 
     private final ItemManager itemManager;
@@ -79,18 +82,16 @@ public class ProfitTrackerInventoryValue {
         log.debug(String.format("calculateItemValue itemId = %d", itemId));
 
         // multiply quantity  by GE value
-        return item.getQuantity() * (itemManager.getItemPrice(itemId));
+        return (long) item.getQuantity() * (itemManager.getItemPrice(itemId));
     }
 
-    public long calculateContainerValue(InventoryID ContainerID)
+    public long calculateContainerValue(int containerID)
     {
         /*
         calculate total inventory value
          */
 
-        long newInventoryValue;
-
-        ItemContainer container = client.getItemContainer(ContainerID);
+        ItemContainer container = client.getItemContainer(containerID);
 
         if (container == null)
         {
@@ -119,7 +120,7 @@ public class ProfitTrackerInventoryValue {
         calculate total inventory value
          */
 
-        return calculateContainerValue(InventoryID.INVENTORY);
+        return calculateContainerValue(InventoryID.INV);
 
     }
 
@@ -128,7 +129,7 @@ public class ProfitTrackerInventoryValue {
         /*
         calculate total equipment value
          */
-        return calculateContainerValue(InventoryID.EQUIPMENT);
+        return calculateContainerValue(InventoryID.WORN);
     }
 
     public long calculateRunePouchValue()
@@ -171,8 +172,8 @@ public class ProfitTrackerInventoryValue {
      * @return Array of items from inventory and equipment containers
      */
     public Item[] getInventoryAndEquipmentContents(){
-        ItemContainer inventoryContainer = client.getItemContainer(InventoryID.INVENTORY);
-        ItemContainer equipmentContainer = client.getItemContainer(InventoryID.EQUIPMENT);
+        ItemContainer inventoryContainer = client.getItemContainer(InventoryID.INV);
+        ItemContainer equipmentContainer = client.getItemContainer(InventoryID.WORN);
 
         if (inventoryContainer == null || equipmentContainer == null)
         {
@@ -197,7 +198,7 @@ public class ProfitTrackerInventoryValue {
     }
 
     public Item[] getGrandExchangeContents(){
-        ArrayList<Item> items = new ArrayList<Item> ();
+        ArrayList<Item> items = new ArrayList<> ();
         //Unclear why, but without an intermediate storage for this variable, just doing items.add(new ...) caused improper quantities
         Item coins;
         for (GrandExchangeOffer offer : offers) {
