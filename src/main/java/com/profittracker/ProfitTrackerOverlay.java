@@ -146,11 +146,11 @@ public class ProfitTrackerOverlay extends Overlay {
     static long calculateProfitHourly(long secondsElapsed, long profit)
     {
         long averageProfitThousandForHour;
-        long averageProfitForSecond;
+        double averageProfitForSecond;
 
         if (secondsElapsed > 0)
         {
-            averageProfitForSecond = (profit) / secondsElapsed;
+            averageProfitForSecond = (double)profit / secondsElapsed;
         }
         else
         {
@@ -158,7 +158,7 @@ public class ProfitTrackerOverlay extends Overlay {
             averageProfitForSecond = 0;
         }
 
-        averageProfitThousandForHour = averageProfitForSecond * 3600 / 1000;
+        averageProfitThousandForHour = (long)(averageProfitForSecond * 3600) / 1000;
 
         return averageProfitThousandForHour;
     }
