@@ -3,7 +3,9 @@ package com.profittracker;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.api.events.ScriptPreFired;
-import net.runelite.api.widgets.InterfaceID;
+import net.runelite.api.gameval.InterfaceID;
+import net.runelite.api.gameval.ItemID;
+import net.runelite.api.gameval.VarbitID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.util.AsyncBufferedImage;
@@ -22,7 +24,7 @@ public class ProfitTrackerGoldDrops {
        which is intended to generate xp drops for maxed out skills.
        Fake XP Drops are composed of a skill sprite,
         and a text widget with a mod icon (<img=11> in text)
-       So to create a gold drop, we create a fake xp drop, and interefere in the middle,
+       So to create a gold drop, we create a fake xp drop, and interfere in the middle,
        and change the sprite and text to our liking.
 
        Flow is:
@@ -32,7 +34,7 @@ public class ProfitTrackerGoldDrops {
 
        A more correct way to do this is probably by calling Item.GetImage with wanted
        coin quantity, which will give us correct coin icon and correct text,
-       and simply drawing that image ourselfs somehow. Instead of using xp drop mechanism.
+       and simply drawing that image ourselves somehow. Instead of using xp drop mechanism.
      */
 
     /*
@@ -115,7 +117,7 @@ public class ProfitTrackerGoldDrops {
         Widget[] xpDropWidgetChildren;
 
         // get widget from ID
-        xpDropWidget = client.getWidget(InterfaceID.EXPERIENCE_TRACKER, xpDropWidgetId & 0xFFFF);
+        xpDropWidget = client.getWidget(InterfaceID.XP_DROPS, xpDropWidgetId & 0xFFFF);
 
         if (xpDropWidget == null)
         {
@@ -194,7 +196,7 @@ public class ProfitTrackerGoldDrops {
         AsyncBufferedImage coin_image_raw;
 
         // get image object by coin item id
-        coin_image_raw = itemManager.getImage(ItemID.COINS_995, 10000, false);
+        coin_image_raw = itemManager.getImage(ItemID.COINS, 10000, false);
 
         // since getImage returns an AsyncBufferedImage, which is not loaded initially,
         // we schedule sprite conversion and sprite override for when the image is actually loaded
@@ -234,14 +236,14 @@ public class ProfitTrackerGoldDrops {
     {
         // taken from XpDropPlugin
         EnumComposition colorEnum = client.getEnum(EnumID.XPDROP_COLORS);
-        int defaultColorId = client.getVarbitValue(Varbits.EXPERIENCE_DROP_COLOR);
+        int defaultColorId = client.getVarbitValue(VarbitID.XPDROPS_COLOUR);
         int color = colorEnum.getIntValue(defaultColorId);
         xpDropTextWidget.setTextColor(color);
     }
 
     private String formatGoldDropText(long goldDropValue)
     {
-        // Format gold value to fit in xp drop to avoid being cutoff by gold sprite
+        // Format gold value to fit in xp drop to avoid being cut off by gold sprite
         // 999
         // 1.0K
         // 20K
@@ -249,7 +251,7 @@ public class ProfitTrackerGoldDrops {
         // 1.0M
 
         float goldValueRep = goldDropValue;
-        String suffix = "";
+        String suffix;
         boolean useDecimal = false;
         if (Math.abs(goldDropValue) < 1000L) { // 1-999
             return Long.toString(goldDropValue);
