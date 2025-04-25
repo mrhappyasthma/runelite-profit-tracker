@@ -88,7 +88,7 @@ public class ProfitTrackerPlugin extends Plugin
         // Add the inventory overlay
         overlayManager.add(overlay);
 
-        goldDropsObject = new ProfitTrackerGoldDrops(client, itemManager);
+        goldDropsObject = new ProfitTrackerGoldDrops(client, itemManager, config);
 
         inventoryValueObject = new ProfitTrackerInventoryValue(client, itemManager);
 

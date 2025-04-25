@@ -11,6 +11,7 @@ import net.runelite.client.game.ItemManager;
 import net.runelite.client.util.AsyncBufferedImage;
 import net.runelite.client.util.ImageUtil;
 
+import javax.inject.Inject;
 import java.awt.*;
 
 import static net.runelite.api.ScriptID.XPDROPS_SETDROPSIZE;
@@ -37,10 +38,23 @@ public class ProfitTrackerGoldDrops {
        and simply drawing that image ourselves somehow. Instead of using xp drop mechanism.
      */
 
+    // Values for each variant of coin sprite, used to help set up and access dynamic coin sprites
+    private static final int[] COINS_SPRITES = {
+            1,
+            2,
+            3,
+            4,
+            5,
+            25,
+            100,
+            250,
+            1000,
+            10000
+    };
     /*
     Free sprite id for the gold icons.
      */
-    private static final int COINS_SPRITE_ID = -1337;
+    private static final int COINS_SPRITE_ID_START = -1337;
 
     // Skill ordinal to send in the fake xp drop script.
     // doesn't matter which skill expect it's better not be attack/defense/magic to avoid collision with
@@ -56,6 +70,8 @@ public class ProfitTrackerGoldDrops {
      */
     private final ItemManager itemManager;
     private final Client client;
+    @Inject
+    private ProfitTrackerConfig config;
 
     /* var currentGoldDropValue will have
     the gold value of the current ongoing gold drop. 2 purposes:
@@ -64,10 +80,11 @@ public class ProfitTrackerGoldDrops {
     */
     private long currentGoldDropValue;
 
-    ProfitTrackerGoldDrops(Client client, ItemManager itemManager)
+    ProfitTrackerGoldDrops(Client client, ItemManager itemManager, ProfitTrackerConfig config)
     {
         this.client = client;
         this.itemManager = itemManager;
+        this.config = config;
 
         prepareCoinSprite();
 
@@ -165,8 +182,15 @@ public class ProfitTrackerGoldDrops {
         Change xpdrop icon and text, to make a gold drop
          */
 
-
-        dropTextWidget.setText(formatGoldDropText(goldDropValue));
+        if (config.shortDrops()) {
+            dropTextWidget.setText(formatGoldDropText(goldDropValue));
+        }else{
+            // Remove disabled icon from string
+            String formattedValue = dropTextWidget.getText();
+            formattedValue = formattedValue.substring(formattedValue.indexOf("> ") + 2);
+            // Restore negative symbol
+            dropTextWidget.setText((goldDropValue < 0 ? "-" : "") + formattedValue);
+        }
 
         if (goldDropValue > 0)
         {
@@ -180,8 +204,18 @@ public class ProfitTrackerGoldDrops {
         }
 
         // change skill sprite to coin sprite
-        dropSpriteWidget.setSpriteId(COINS_SPRITE_ID);
-
+        if (config.iconStyle() == ProfitTrackerIconType.DYNAMIC){
+            for (int spriteIndex = 0; spriteIndex < COINS_SPRITES.length; spriteIndex++){
+                if (Math.abs(goldDropValue) < COINS_SPRITES[spriteIndex]){
+                    dropSpriteWidget.setSpriteId(COINS_SPRITE_ID_START - spriteIndex + 1);
+                    break;
+                } else if (spriteIndex == COINS_SPRITES.length - 1) {
+                    dropSpriteWidget.setSpriteId(COINS_SPRITE_ID_START - spriteIndex);
+                }
+            }
+        }else{
+            dropSpriteWidget.setSpriteId(COINS_SPRITE_ID_START - config.iconStyle().ordinal() + 1);
+        }
     }
 
     private void prepareCoinSprite()
@@ -193,23 +227,26 @@ public class ProfitTrackerGoldDrops {
 
         */
 
-        AsyncBufferedImage coin_image_raw;
+        //Create a sprite for each coin type
+        for (int spriteIndex = 0; spriteIndex < COINS_SPRITES.length; spriteIndex++){
+            AsyncBufferedImage coin_image_raw;
 
-        // get image object by coin item id
-        coin_image_raw = itemManager.getImage(ItemID.COINS, 10000, false);
+            // get image object by coin item id
+            coin_image_raw = itemManager.getImage(ItemID.COINS, COINS_SPRITES[spriteIndex], false);
 
-        // since getImage returns an AsyncBufferedImage, which is not loaded initially,
-        // we schedule sprite conversion and sprite override for when the image is actually loaded
-        coin_image_raw.onLoaded(() -> {
-            final SpritePixels coin_sprite;
+            // since getImage returns an AsyncBufferedImage, which is not loaded initially,
+            // we schedule sprite conversion and sprite override for when the image is actually loaded
+            int finalSpriteIndex = spriteIndex;
+            coin_image_raw.onLoaded(() -> {
+                final SpritePixels coin_sprite;
 
-            // convert image to sprite
-            coin_sprite = ImageUtil.getImageSpritePixels(coin_image_raw, client);
+                // convert image to sprite
+                coin_sprite = ImageUtil.getImageSpritePixels(coin_image_raw, client);
 
-            // register new coin sprite by overriding a free sprite id
-            client.getSpriteOverrides().put(COINS_SPRITE_ID, coin_sprite);
-        });
-
+                // register new coin sprite by overriding a free sprite id
+                client.getSpriteOverrides().put(COINS_SPRITE_ID_START - finalSpriteIndex, coin_sprite);
+            });
+        }
     }
 
     public void requestGoldDrop(long amount)
@@ -227,9 +264,21 @@ public class ProfitTrackerGoldDrops {
         // 1. skill ordinal - we will replace the icon anyway
         // 2. value - since we want to be able to pass negative numbers, we pass the value using
         // currentGoldDropValue instead of this argument
+        String formattedAmount = formatGoldDropText(currentGoldDropValue);
 
-        client.runScript(XPDROP_DISABLED, XPDROP_SKILL, XPDROP_VALUE);
-
+        if (config.shortDrops()) {
+            //Use a value to slightly adjust sprite position, as manually setting text later doesn't adjust it
+            int sizeAdjustingValue = 1;
+            sizeAdjustingValue = formattedAmount.length() > 3 ? 6 : sizeAdjustingValue;
+            sizeAdjustingValue = formattedAmount.length() > 4 ? 60 : sizeAdjustingValue;
+            sizeAdjustingValue = formattedAmount.length() > 4 && formattedAmount.contains(".") ? 10 : sizeAdjustingValue;
+            sizeAdjustingValue = formattedAmount.length() == 4 && !formattedAmount.contains(".") ? 11 : sizeAdjustingValue;
+            client.runScript(XPDROP_DISABLED, XPDROP_SKILL, sizeAdjustingValue);
+        }
+        else
+        {
+            client.runScript(XPDROP_DISABLED, XPDROP_SKILL, (int) Math.abs(currentGoldDropValue));
+        }
     }
 
     private void resetXpDropTextColor(Widget xpDropTextWidget)
