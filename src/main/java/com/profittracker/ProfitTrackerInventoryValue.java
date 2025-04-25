@@ -43,6 +43,7 @@ public class ProfitTrackerInventoryValue {
 
     private final ItemManager itemManager;
     private final Client client;
+    public GrandExchangeOffer[] offers = new GrandExchangeOffer[8];
 
     public ProfitTrackerInventoryValue( Client client, ItemManager itemManager) {
         this.client = client;
@@ -173,7 +174,6 @@ public class ProfitTrackerInventoryValue {
         ItemContainer inventoryContainer = client.getItemContainer(InventoryID.INVENTORY);
         ItemContainer equipmentContainer = client.getItemContainer(InventoryID.EQUIPMENT);
 
-
         if (inventoryContainer == null || equipmentContainer == null)
         {
             return null;
@@ -194,6 +194,39 @@ public class ProfitTrackerInventoryValue {
             return null;
         }
         return expandContainers(bankContainer.getItems());
+    }
+
+    public Item[] getGrandExchangeContents(){
+        ArrayList<Item> items = new ArrayList<Item> ();
+        //Unclear why, but without an intermediate storage for this variable, just doing items.add(new ...) caused improper quantities
+        Item coins;
+        for (GrandExchangeOffer offer : offers) {
+            if (offer == null) {
+                items.add(new Item(-1, 0));
+                continue;
+            }
+            switch (offer.getState()) {
+                case BOUGHT:
+                case BUYING:
+                case CANCELLED_BUY:
+                    items.add(new Item(offer.getItemId(), offer.getQuantitySold()));
+                    coins = new Item(net.runelite.api.gameval.ItemID.COINS, offer.getPrice() * (offer.getTotalQuantity() - offer.getQuantitySold()));
+                    items.add(coins);
+                    break;
+                case SOLD:
+                case SELLING:
+                case CANCELLED_SELL:
+                    items.add(new Item(offer.getItemId(), offer.getTotalQuantity() - offer.getQuantitySold()));
+                    coins = new Item(net.runelite.api.gameval.ItemID.COINS, offer.getSpent());
+                    items.add(coins);
+                    break;
+                case EMPTY:
+                default:
+                    items.add(new Item(-1, 0));
+                    break;
+            }
+        }
+        return items.toArray(new Item[0]);
     }
 
     private Item[] expandContainers(Item[] items){

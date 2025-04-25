@@ -18,6 +18,8 @@ import net.runelite.api.events.VarbitChanged;
 import org.apache.commons.lang3.ArrayUtils;
 
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 @Slf4j
 @PluginDescriptor(
@@ -30,9 +32,10 @@ public class ProfitTrackerPlugin extends Plugin
 
     // the profit will be calculated against this value
     private long prevInventoryValue;
+    private Map<String, ProfitTrackerPossessions> accountPossessions;
+    private ProfitTrackerPossessions previousPossessions;
+    private String previousAccount;
     // Collection of items that was last used to calculate value, includes inventory and equipment
-    private Item[] prevInventoryItems;
-    private Item[] prevBankItems;
     private long totalProfit;
 
     private long startTickMillis;
@@ -40,6 +43,7 @@ public class ProfitTrackerPlugin extends Plugin
     private boolean skipTickForProfitCalculation;
     private boolean inventoryValueChanged;
     private boolean bankValueChanged;
+    private boolean grandExchangeValueChanged;
     private boolean inProfitTrackSession;
     private boolean runePouchContentsChanged;
     // Remembers if the bank was open last tick, because tick perfect bank close reports changes late
@@ -97,8 +101,9 @@ public class ProfitTrackerPlugin extends Plugin
 
     private void initializeVariables()
     {
-        prevInventoryItems = null;
-        prevBankItems = null;
+        accountPossessions = new HashMap<String,ProfitTrackerPossessions>();
+        previousPossessions = null;
+        previousAccount = null;
 
         // profit begins at 0 of course
         totalProfit = 0;
@@ -112,6 +117,8 @@ public class ProfitTrackerPlugin extends Plugin
         inventoryValueChanged = false;
 
         bankValueChanged = false;
+
+        grandExchangeValueChanged = false;
 
         inProfitTrackSession = false;
 
@@ -140,6 +147,25 @@ public class ProfitTrackerPlugin extends Plugin
         overlay.startSession();
 
         inProfitTrackSession = true;
+    }
+
+    /**
+     * Creates an entry for the current login if needed.
+     * Hooks up the possessions collection for repeat use for the current login.
+     */
+    private void checkAccount()
+    {
+        //TODO Account for special worlds where a player with the same name might have different possessions
+        String accountIdentifier = client.getLocalPlayer().getName();
+        accountPossessions.putIfAbsent(client.getLocalPlayer().getName(),new ProfitTrackerPossessions());
+        previousPossessions = accountPossessions.get(accountIdentifier);
+
+        if (previousAccount == null || ! previousAccount.equals(accountIdentifier)) {
+            if (client.getGameState() == GameState.LOGGED_IN)
+            {
+                inventoryValueObject.offers = client.getGrandExchangeOffers();
+            }
+        }
     }
 
     @Override
@@ -176,6 +202,8 @@ public class ProfitTrackerPlugin extends Plugin
             }
         }
 
+        checkAccount();
+
         boolean skipOnce = false;
         if (bankJustClosed) {
             // Interacting with bank
@@ -184,7 +212,7 @@ public class ProfitTrackerPlugin extends Plugin
         }
         bankJustClosed = false;
 
-        if (inventoryValueChanged || runePouchContentsChanged || bankValueChanged)
+        if (inventoryValueChanged || runePouchContentsChanged || bankValueChanged || grandExchangeValueChanged)
         {
             if (skipOnce) {
                 skipTickForProfitCalculation = true;
@@ -217,6 +245,7 @@ public class ProfitTrackerPlugin extends Plugin
             inventoryValueChanged = false;
             bankValueChanged = false;
             runePouchContentsChanged = false;
+            grandExchangeValueChanged = false;
         }
     }
 
@@ -242,29 +271,37 @@ public class ProfitTrackerPlugin extends Plugin
         long newInventoryValue;
         Item[] newInventoryItems;
         Item[] newBankItems;
+        Item[] newGrandExchangeItems;
         long newProfit;
-        Item[] inventoryDifference;
+        Item[] possessionDifference;
         Item[] bankDifference = new Item[0];
+        Item[] grandExchangeDifference = new Item[0];
 
         // calculate current inventory value
         //newInventoryValue = inventoryValueObject.calculateInventoryAndEquipmentValue();
         newInventoryItems = inventoryValueObject.getInventoryAndEquipmentContents();
         newBankItems = inventoryValueObject.getBankContents();
+        newGrandExchangeItems = inventoryValueObject.getGrandExchangeContents();
 
-        if (!skipTickForProfitCalculation && prevInventoryItems != null)
+        if (!skipTickForProfitCalculation && previousPossessions.inventoryItems != null)
         {
             // calculate new profit
             // newProfit = newInventoryValue - prevInventoryValue;
-            inventoryDifference = inventoryValueObject.getItemCollectionDifference(prevInventoryItems,newInventoryItems);
-            newProfit = inventoryValueObject.calculateItemValue(inventoryDifference);
-            if (prevBankItems != null && newBankItems != null) {
-                bankDifference = inventoryValueObject.getItemCollectionDifference(prevBankItems,newBankItems);
+            possessionDifference = inventoryValueObject.getItemCollectionDifference(previousPossessions.inventoryItems,newInventoryItems);
+            newProfit = inventoryValueObject.calculateItemValue(possessionDifference);
+            if (previousPossessions.bankItems != null && newBankItems != null) {
+                bankDifference = inventoryValueObject.getItemCollectionDifference(previousPossessions.bankItems,newBankItems);
                 // Profit is recalculated on all items instead of summed just in case item values could change between calculations
-                Item[] inventoryAndBankDifference = ArrayUtils.addAll(inventoryDifference,bankDifference);
-                newProfit = inventoryValueObject.calculateItemValue(inventoryAndBankDifference);
+                possessionDifference = ArrayUtils.addAll(possessionDifference,bankDifference);
+                newProfit = inventoryValueObject.calculateItemValue(possessionDifference);
+            }
+            if (previousPossessions.grandExchangeItems != null && newGrandExchangeItems != null) {
+                grandExchangeDifference = inventoryValueObject.getItemCollectionDifference(previousPossessions.grandExchangeItems,newGrandExchangeItems);
+                possessionDifference = ArrayUtils.addAll(possessionDifference,grandExchangeDifference);
+                newProfit = inventoryValueObject.calculateItemValue(possessionDifference);
             }
 
-            log.debug("Calculated " + newProfit + " profit for " + (inventoryDifference.length + bankDifference.length) + " item changes.");
+            log.debug("Calculated " + newProfit + " profit for " + (possessionDifference.length) + " item changes.");
         }
         else
         {
@@ -279,14 +316,15 @@ public class ProfitTrackerPlugin extends Plugin
 
         // update prevInventoryValue for future calculations anyway!
         //prevInventoryValue = newInventoryValue;
-        prevInventoryItems = newInventoryItems;
+        previousPossessions.inventoryItems = newInventoryItems;
         if (newBankItems != null) {
-            if (prevBankItems == null) {
+            if (previousPossessions.bankItems == null) {
                 // If user hasn't opened bank yet, the deficit doesn't help us resync
                 depositDeficit = 0;
             }
-            prevBankItems = newBankItems;
+            previousPossessions.bankItems = newBankItems;
         }
+        previousPossessions.grandExchangeItems = newGrandExchangeItems;
 
         return newProfit;
     }
@@ -301,21 +339,37 @@ public class ProfitTrackerPlugin extends Plugin
         log.debug("onItemContainerChanged container id: " + event.getContainerId());
 
         int containerId = event.getContainerId();
-
-        if( containerId == InventoryID.INVENTORY.getId() ||
+        if (containerId == InventoryID.INVENTORY.getId() ||
             containerId == InventoryID.EQUIPMENT.getId()) {
             // inventory has changed - need calculate profit in onGameTick
             inventoryValueChanged = true;
         }
 
-        if( containerId == InventoryID.BANK.getId()) {
+        if (containerId == InventoryID.BANK.getId()) {
             bankValueChanged = true;
         }
 
         // In these events, inventory WILL be changed, but we DON'T want to calculate profit!
-        if( containerId == 855 || // Huntsman's kit
+        if (containerId == 855 || // Huntsman's kit
             containerId == InventoryID.SEED_VAULT.getId()) { // Seed vault
             skipTickForProfitCalculation = true;
+        }
+    }
+
+    @Subscribe
+    public void onGrandExchangeOfferChanged(GrandExchangeOfferChanged event)
+    {
+        //Profit for GE offers is only calculated when we have seen a different non-empty state of the offer
+        int slot = event.getSlot();
+        GrandExchangeOffer offer = event.getOffer();
+
+        if (offer.getState() == GrandExchangeOfferState.EMPTY && client.getGameState() != GameState.LOGGED_IN) {
+            grandExchangeValueChanged = false;
+        }else {
+            if (inventoryValueObject.offers[slot] == null){
+                grandExchangeValueChanged = true;
+            }
+            inventoryValueObject.offers[slot] = offer;
         }
     }
 
