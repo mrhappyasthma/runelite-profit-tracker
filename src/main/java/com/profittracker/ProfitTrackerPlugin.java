@@ -90,7 +90,7 @@ public class ProfitTrackerPlugin extends Plugin
 
         goldDropsObject = new ProfitTrackerGoldDrops(client, itemManager, config);
 
-        inventoryValueObject = new ProfitTrackerInventoryValue(client, itemManager);
+        inventoryValueObject = new ProfitTrackerInventoryValue(client, itemManager, config);
 
         initializeVariables();
 

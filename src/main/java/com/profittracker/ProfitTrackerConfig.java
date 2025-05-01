@@ -50,5 +50,15 @@ public interface ProfitTrackerConfig extends Config
     {
         return ProfitTrackerIconType.DYNAMIC;
     }
+
+    @ConfigItem(
+            keyName = "estimateUntradeables",
+            name = "Estimate untradeable item values",
+            description = "Some untradeable items will utilize equivalent values of the best items they can convert into."
+    )
+    default boolean estimateUntradeables()
+    {
+        return true;
+    }
 }
 
