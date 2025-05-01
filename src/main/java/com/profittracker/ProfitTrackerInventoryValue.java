@@ -45,17 +45,59 @@ public class ProfitTrackerInventoryValue {
             VarbitID.RUNE_POUCH_TYPE_4
     };
 
+    private final int[] COLLECTION_BOX_INVENTORY_IDS = {
+            InventoryID.TRADINGPOST_SELL_0,
+            InventoryID.TRADINGPOST_SELL_1,
+            InventoryID.TRADINGPOST_SELL_2,
+            InventoryID.TRADINGPOST_SELL_3,
+            InventoryID.TRADINGPOST_SELL_4,
+            InventoryID.TRADINGPOST_SELL_5,
+            InventoryID.GE_COLLECT_6,
+            InventoryID.GE_COLLECT_7
+    };
+
     private final ItemManager itemManager;
     private final Client client;
     @Inject
     private ProfitTrackerConfig config;
     private GrandExchangeOfferData[] offers = new GrandExchangeOfferData[8];
 
+    /**
+     * Data storage for GE offers as the normal object always maintains a reference,
+     * and we need to be able to compare changes that have occurred
+     */
+    private static class GrandExchangeOfferData{
+        int quantitySold;
+        int id;
+        int totalQuantity;
+        int price;
+        int spent;
+        GrandExchangeOfferState state;
+
+        public GrandExchangeOfferData(GrandExchangeOffer offer){
+            this.quantitySold = offer.getQuantitySold();
+            this.id = offer.getItemId();
+            this.totalQuantity = offer.getTotalQuantity();
+            this.price = offer.getPrice();
+            this.spent = offer.getSpent();
+            this.state = offer.getState();
+        }
+    }
 
     public ProfitTrackerInventoryValue( Client client, ItemManager itemManager, ProfitTrackerConfig config) {
         this.client = client;
         this.itemManager = itemManager;
         this.config = config;
+    }
+
+    public void setOffers(GrandExchangeOffer[] offers){
+        if (offers == null){
+            this.offers = new GrandExchangeOfferData[8];
+            return;
+        }
+        for (int index = 0; index < offers.length; index++){
+            this.offers[index] = new GrandExchangeOfferData(offers[index]);
+        }
     }
 
     private long calculateItemValue(Item item) {
@@ -110,8 +152,6 @@ public class ProfitTrackerInventoryValue {
 
     /**
      * Calculates the value of an array of items
-     * @param items
-     * @return
      */
     public long calculateItemValue(Item[] items) {
         if (config.estimateUntradeables()){
@@ -163,7 +203,7 @@ public class ProfitTrackerInventoryValue {
             return 0;
         }
         log.debug(String.format("calculateRuneValue runeId = %d", runeId));
-        return itemManager.getItemPrice(runePouchEnum.getIntValue(runeId)) * runeQuantity;
+        return (long)(itemManager.getItemPrice(runePouchEnum.getIntValue(runeId))) * runeQuantity;
     }
 
     public long calculateInventoryAndEquipmentValue()
@@ -209,25 +249,24 @@ public class ProfitTrackerInventoryValue {
         ArrayList<Item> items = new ArrayList<> ();
         //Unclear why, but without an intermediate storage for this variable, just doing items.add(new ...) caused improper quantities
         Item coins;
-        for (GrandExchangeOffer offer : offers) {
+        for (GrandExchangeOfferData offer : offers) {
             if (offer == null) {
                 items.add(new Item(-1, 0));
                 continue;
             }
-            switch (offer.getState()) {
+            switch (offer.state) {
                 case BOUGHT:
                 case BUYING:
-                case CANCELLED_BUY:
-                    items.add(new Item(offer.getItemId(), offer.getQuantitySold()));
-                    coins = new Item(net.runelite.api.gameval.ItemID.COINS, offer.getPrice() * (offer.getTotalQuantity() - offer.getQuantitySold()));
+                    coins = new Item(ItemID.COINS, offer.price * (offer.totalQuantity - offer.quantitySold)); //Gold left to spend
                     items.add(coins);
                     break;
                 case SOLD:
                 case SELLING:
+                    items.add(new Item(offer.id, offer.totalQuantity - offer.quantitySold)); //Items left to sell
+                    break;
+                case CANCELLED_BUY:
                 case CANCELLED_SELL:
-                    items.add(new Item(offer.getItemId(), offer.getTotalQuantity() - offer.getQuantitySold()));
-                    coins = new Item(net.runelite.api.gameval.ItemID.COINS, offer.getSpent());
-                    items.add(coins);
+                    //All pending value in the offer will be moved to the collection item container
                     break;
                 case EMPTY:
                 default:
@@ -235,7 +274,23 @@ public class ProfitTrackerInventoryValue {
                     break;
             }
         }
-        return items.toArray(new Item[0]);
+        return ArrayUtils.addAll(items.toArray(new Item[0]), getCollectionBoxContents());
+    }
+
+    /**
+     * Gets all items sitting in the collection box for GE offers.
+     * Can only access this data when the interface is open, avoid calling from something like onGrandExchangeOfferChanged
+     * which can happen at any time.
+     */
+    private Item[] getCollectionBoxContents(){
+        Item[] items = new Item[0];
+        for (int collectionBoxInventoryId : COLLECTION_BOX_INVENTORY_IDS) {
+            ItemContainer collectionBox = client.getItemContainer(collectionBoxInventoryId);
+            if (collectionBox != null) {
+                items = ArrayUtils.addAll(items, collectionBox.getItems());
+            }
+        }
+        return items;
     }
 
     private Item[] expandContainers(Item[] items){
@@ -342,7 +397,6 @@ public class ProfitTrackerInventoryValue {
 
     /**
      * Converts the given item array into a map
-     * @param items
      * @return Map of item ID -> QTY
      */
     private Map<Integer, Integer> mapItemArray(Item[] items){
@@ -354,9 +408,7 @@ public class ProfitTrackerInventoryValue {
     /**
      * Compares the two arrays, returning an array of item differences
      * For example, dropping a shark would be an array of 1 shark item, with quantity -1
-     * @param originalItems
-     * @param newItems
-     * @return
+     * @return Array of items with quantity set to the difference
      */
     public Item[] getItemCollectionDifference(Item[] originalItems, Item[] newItems){
         Map<Integer, Integer> originalItemList = mapItemArray(originalItems);

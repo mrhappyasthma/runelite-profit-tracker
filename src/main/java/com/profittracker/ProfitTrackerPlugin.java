@@ -51,6 +51,8 @@ public class ProfitTrackerPlugin extends Plugin
     private boolean runePouchContentsChanged;
     // Remembers if the bank was open last tick, because tick perfect bank close reports changes late
     private boolean bankJustClosed;
+    // Remembers the state of grand exchange
+    private boolean grandExchangeOpened;
     // Set when using a deposit menu option. Used to create a depositing deficit for the next time you open bank
     // This ensures using a deposit box doesn't spam coin drops, but also doesn't get out of sync when the race
     // condition with menu options and container changes causes some anyway
@@ -94,7 +96,7 @@ public class ProfitTrackerPlugin extends Plugin
 
         initializeVariables();
 
-        // start tracking only if plugin was re-started mid game
+        // start tracking only if plugin was re-started mid-game
         if (client.getGameState() == GameState.LOGGED_IN)
         {
             startProfitTrackingSession();
@@ -107,6 +109,7 @@ public class ProfitTrackerPlugin extends Plugin
         accountPossessions = new HashMap<>();
         previousPossessions = null;
         previousAccount = null;
+        inventoryValueObject.setOffers(null);
 
         // profit begins at 0 of course
         totalProfit = 0;
@@ -158,17 +161,27 @@ public class ProfitTrackerPlugin extends Plugin
      */
     private void checkAccount()
     {
-        //TODO Account for special worlds where a player with the same name might have different possessions
-        String accountIdentifier = client.getLocalPlayer().getName();
-        accountPossessions.putIfAbsent(client.getLocalPlayer().getName(),new ProfitTrackerPossessions());
-        previousPossessions = accountPossessions.get(accountIdentifier);
+        //Account for special worlds where a player with the same name might have different possessions
+        //For example, a speedrunning world has MEMBER and SPEEDRUNNING types
+        StringBuilder accountIdentifier = new StringBuilder(client.getLocalPlayer().getName());
+        WorldType[] worldTypes = client.getWorldType().toArray(new WorldType[0]);
+        for (WorldType worldType : worldTypes) {
+            accountIdentifier.append(worldType.name());
+        }
 
-        if (previousAccount == null || ! previousAccount.equals(accountIdentifier)) {
-            if (client.getGameState() == GameState.LOGGED_IN)
+        accountPossessions.putIfAbsent(accountIdentifier.toString(),new ProfitTrackerPossessions());
+        previousPossessions = accountPossessions.get(accountIdentifier.toString());
+
+        if (previousAccount == null || ! previousAccount.contentEquals(accountIdentifier)) {
+            if (client.getGameState() == GameState.LOGGED_IN && grandExchangeOpened)
             {
-                inventoryValueObject.offers = client.getGrandExchangeOffers();
+                inventoryValueObject.setOffers(client.getGrandExchangeOffers());
+                previousPossessions.grandExchangeItems = inventoryValueObject.getGrandExchangeContents();
+            } else {
+                previousPossessions.grandExchangeItems = null;
             }
         }
+        previousAccount = accountIdentifier.toString();
     }
 
     @Override
@@ -207,12 +220,9 @@ public class ProfitTrackerPlugin extends Plugin
 
         checkAccount();
 
-        boolean skipOnce = false;
-        if (bankJustClosed) {
-            // Interacting with bank
-            // itemContainerChanged does not report bank change if closed on same tick
-            skipOnce = true;
-        }
+        // Interacting with bank
+        // itemContainerChanged does not report bank change if closed on same tick
+        boolean skipOnce = bankJustClosed;
         bankJustClosed = false;
 
         if (inventoryValueChanged || runePouchContentsChanged || bankValueChanged || grandExchangeValueChanged)
@@ -253,12 +263,26 @@ public class ProfitTrackerPlugin extends Plugin
     }
 
     @Subscribe
+    public void onWidgetLoaded(WidgetLoaded event)
+    {
+        if (event.getGroupId() == InterfaceID.GE_COLLECT ||
+                event.getGroupId() == InterfaceID.GE_OFFERS) {
+            inventoryValueObject.setOffers(client.getGrandExchangeOffers());
+            grandExchangeOpened = true;
+        }
+    }
+
+    @Subscribe
     public void onWidgetClosed(WidgetClosed event)
     {
         //Catch untracked storage closing, as tick perfect close can cause onItemContainerChanged to not see the change
         if (event.getGroupId() == InterfaceID.HUNTSMANS_KIT || //Huntsman's kit
             event.getGroupId() == InterfaceID.SEED_VAULT) { // Seed vault
             bankJustClosed = true;
+        }
+        if (event.getGroupId() == InterfaceID.GE_COLLECT ||
+                event.getGroupId() == InterfaceID.GE_OFFERS) {
+            grandExchangeOpened = false;
         }
     }
 
@@ -269,27 +293,25 @@ public class ProfitTrackerPlugin extends Plugin
         Calculate and return the profit for this tick
         if skipTickForProfitCalculation is set, meaning this tick was bank / deposit
         so return 0
-
          */
-        long newInventoryValue;
         Item[] newInventoryItems;
         Item[] newBankItems;
-        Item[] newGrandExchangeItems;
+        Item[] newGrandExchangeItems = null;
         long newProfit;
         Item[] possessionDifference;
         Item[] bankDifference;
         Item[] grandExchangeDifference;
 
         // calculate current inventory value
-        //newInventoryValue = inventoryValueObject.calculateInventoryAndEquipmentValue();
         newInventoryItems = inventoryValueObject.getInventoryAndEquipmentContents();
         newBankItems = inventoryValueObject.getBankContents();
-        newGrandExchangeItems = inventoryValueObject.getGrandExchangeContents();
+        if (grandExchangeValueChanged) {
+            newGrandExchangeItems = inventoryValueObject.getGrandExchangeContents();
+        }
 
-        if (!skipTickForProfitCalculation && previousPossessions.inventoryItems != null)
+        if (!skipTickForProfitCalculation && previousPossessions.inventoryItems != null && newInventoryItems != null)
         {
             // calculate new profit
-            // newProfit = newInventoryValue - prevInventoryValue;
             possessionDifference = inventoryValueObject.getItemCollectionDifference(previousPossessions.inventoryItems,newInventoryItems);
             newProfit = inventoryValueObject.calculateItemValue(possessionDifference);
             if (previousPossessions.bankItems != null && newBankItems != null) {
@@ -327,7 +349,9 @@ public class ProfitTrackerPlugin extends Plugin
             }
             previousPossessions.bankItems = newBankItems;
         }
-        previousPossessions.grandExchangeItems = newGrandExchangeItems;
+        if (newGrandExchangeItems != null) {
+            previousPossessions.grandExchangeItems = newGrandExchangeItems;
+        }
 
         return newProfit;
     }
@@ -345,7 +369,7 @@ public class ProfitTrackerPlugin extends Plugin
 
         if (containerId == InventoryID.INV ||
             containerId == InventoryID.WORN) {
-            // inventory has changed - need calculate profit in onGameTick
+            // Inventory has changed - need calculate profit in onGameTick
             inventoryValueChanged = true;
         }
 
@@ -354,26 +378,23 @@ public class ProfitTrackerPlugin extends Plugin
         }
 
         // In these events, inventory WILL be changed, but we DON'T want to calculate profit!
-        if (containerId == 855 || // Huntsman's kit
+        if (containerId == InventoryID.HUNTSMANS_KIT || // Huntsman's kit
             containerId == InventoryID.SEED_VAULT) { // Seed vault
             skipTickForProfitCalculation = true;
+        }
+
+        // No container event occurs for the GE collection item containers, but inventory does
+        if (grandExchangeOpened) {
+            grandExchangeValueChanged = true;
         }
     }
 
     @Subscribe
     public void onGrandExchangeOfferChanged(GrandExchangeOfferChanged event)
     {
-        //Profit for GE offers is only calculated when we have seen a different non-empty state of the offer
-        int slot = event.getSlot();
-        GrandExchangeOffer offer = event.getOffer();
-
-        if (offer.getState() == GrandExchangeOfferState.EMPTY && client.getGameState() != GameState.LOGGED_IN) {
-            grandExchangeValueChanged = false;
-        }else {
-            if (inventoryValueObject.offers[slot] == null){
-                grandExchangeValueChanged = true;
-            }
-            inventoryValueObject.offers[slot] = offer;
+        if (grandExchangeOpened){
+            inventoryValueObject.setOffers(client.getGrandExchangeOffers());
+            grandExchangeValueChanged = true;
         }
     }
 
