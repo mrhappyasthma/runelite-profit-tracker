@@ -8,6 +8,7 @@ import net.runelite.api.gameval.ItemID;
 import net.runelite.api.gameval.VarbitID;
 import net.runelite.api.gameval.InventoryID;
 
+import javax.inject.Inject;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
@@ -46,11 +47,15 @@ public class ProfitTrackerInventoryValue {
 
     private final ItemManager itemManager;
     private final Client client;
-    public GrandExchangeOffer[] offers = new GrandExchangeOffer[8];
+    @Inject
+    private ProfitTrackerConfig config;
+    private GrandExchangeOfferData[] offers = new GrandExchangeOfferData[8];
 
-    public ProfitTrackerInventoryValue( Client client, ItemManager itemManager) {
+
+    public ProfitTrackerInventoryValue( Client client, ItemManager itemManager, ProfitTrackerConfig config) {
         this.client = client;
         this.itemManager = itemManager;
+        this.config = config;
     }
 
     private long calculateItemValue(Item item) {
@@ -109,6 +114,9 @@ public class ProfitTrackerInventoryValue {
      * @return
      */
     public long calculateItemValue(Item[] items) {
+        if (config.estimateUntradeables()){
+            items = replaceUntradeables(items);
+        }
         return Arrays.stream(items).flatMapToLong(item ->
                 LongStream.of(calculateItemValue(item))
         ).sum();
@@ -241,6 +249,82 @@ public class ProfitTrackerInventoryValue {
             }
         }
         return ArrayUtils.addAll(items,extraItems);
+    }
+
+    /**
+     * Replaces various untradeable items with items they can be converted into, or coin values of those items
+     */
+    private Item[] replaceUntradeables(Item[] items){
+        Item[] extraItems = new Item[0];
+        Item[] resultItems = items.clone();
+        for (int i = 0; i < resultItems.length; i++){
+            switch (resultItems[i].getId()){
+                case ItemID.MINNOW:
+                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.RAW_SHARK,resultItems[i].getQuantity() / 40));
+                    resultItems[i] = new Item(-1,0);
+                    break;
+                //Mark of grace for amylase crystals seems to be covered already by the GE value checker
+                case ItemID.VARLAMORE_WYRM_AGILITY_TERMITE:
+                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.AMYLASE,resultItems[i].getQuantity()));
+                    resultItems[i] = new Item(-1,0);
+                    break;
+                case ItemID.AGILITYARENA_TICKET: //Old agility arena ticker for pirate's hook
+                case ItemID.AGILITYARENA_VOUCHER: //Brimhaven voucher for pirate's hook
+                    int hookValue = (int) calculateItemValue(new Item(ItemID.PIRATEHOOK, 1));
+                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.COINS,resultItems[i].getQuantity() * hookValue / 800));
+                    resultItems[i] = new Item(-1,0);
+                    break;
+                case ItemID.STAR_DUST:
+                case ItemID.STAR_DUST_25:
+                case ItemID.STAR_DUST_75:
+                case ItemID.STAR_DUST_125:
+                case ItemID.STAR_DUST_175:
+                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.SOFTCLAY,resultItems[i].getQuantity() * 2 / 3));
+                    resultItems[i] = new Item(-1,0);
+                    break;
+                case ItemID.MOTHERLODE_NUGGET:
+                case ItemID.MGUILD_MINERALS:
+                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.SOFTCLAY,resultItems[i].getQuantity() * 10));
+                    resultItems[i] = new Item(-1,0);
+                    break;
+                case ItemID.FORESTRY_CURRENCY: //Anima bark for felling axe handle
+                    int handleValue = (int)(calculateItemValue(new Item(ItemID.FORESTRY_2H_AXE_HANDLE, 1)) - calculateItemValue(new Item(ItemID.OAK_LOGS, 500)));
+                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.COINS,resultItems[i].getQuantity() * handleValue / 10000));
+                    resultItems[i] = new Item(-1,0);
+                    break;
+                case ItemID.PRIF_CRYSTAL_SHARD: //Crystal shard high alch
+                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.COINS,resultItems[i].getQuantity() * 6000));
+                    resultItems[i] = new Item(-1,0);
+                    break;
+                case ItemID.PRIF_CRYSTAL_SHARD_CRUSHED:
+                    // Profit from making divine super combat, used for crystal shards/dust
+                    int potionProfit = (int)(calculateItemValue(new Item(ItemID._4DOSEDIVINECOMBAT, 1)) - calculateItemValue(new Item(ItemID._4DOSE2COMBAT,1)));
+                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.COINS,resultItems[i].getQuantity() * potionProfit / 4));
+                    resultItems[i] = new Item(-1,0);
+                    break;
+                case ItemID.TZHAAR_TOKEN: //Tokkul for onyx
+                    int onyxValue = (int) calculateItemValue(new Item(ItemID.ONYX, 1));
+                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.COINS,resultItems[i].getQuantity() * onyxValue / 300000));
+                    resultItems[i] = new Item(-1,0);
+                    break;
+                case ItemID.ABYSSAL_PEARL: //Abyssal pearls for ring of the elements
+                    int roteValue = (int) calculateItemValue(new Item(ItemID.RING_OF_ELEMENTS, 1));
+                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.COINS,resultItems[i].getQuantity() * roteValue / 400));
+                    resultItems[i] = new Item(-1,0);
+                    break;
+                case ItemID.VILLAGE_TRADE_STICKS: //Trading sticks for gout tubers
+                    int tuberValue = (int) calculateItemValue(new Item(ItemID.VILLAGE_RARE_TUBER, 1));
+                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.COINS,resultItems[i].getQuantity() * tuberValue / 120));
+                    resultItems[i] = new Item(-1,0);
+                    break;
+                case ItemID.FOSSIL_MERMAID_TEAR: //Mermaid tears for merfolk trident
+                    int tridentValue = (int) calculateItemValue(new Item(ItemID.MERFOLK_TRIDENT, 1));
+                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.COINS,resultItems[i].getQuantity() * tridentValue / 400));
+                    resultItems[i] = new Item(-1,0);
+                    break;
+            }
+        }
+        return ArrayUtils.addAll(resultItems,extraItems);
     }
 
     private Item[] getRunePouchItems(){
