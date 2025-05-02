@@ -181,6 +181,9 @@ public class ProfitTrackerPlugin extends Plugin
                 previousPossessions.grandExchangeItems = null;
             }
         }
+
+        overlay.setBankStatus(previousPossessions.bankItems != null);
+
         previousAccount = accountIdentifier.toString();
     }
 

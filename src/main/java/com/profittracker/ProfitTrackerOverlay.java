@@ -1,9 +1,13 @@
 package com.profittracker;
+import net.runelite.api.Client;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.components.LineComponent;
 import net.runelite.client.ui.overlay.components.PanelComponent;
 import net.runelite.client.ui.overlay.components.TitleComponent;
+import net.runelite.client.ui.overlay.components.TooltipComponent;
+import net.runelite.client.ui.overlay.tooltip.Tooltip;
+import net.runelite.client.ui.overlay.tooltip.TooltipManager;
 
 import javax.inject.Inject;
 import javax.swing.*;
@@ -17,6 +21,7 @@ public class ProfitTrackerOverlay extends Overlay {
     private long profitValue;
     private long startTimeMillies;
     private boolean inProfitTrackSession;
+    private boolean hasBankData;
 
     private final ProfitTrackerConfig ptConfig;
     private final PanelComponent panelComponent = new PanelComponent();
@@ -26,6 +31,10 @@ public class ProfitTrackerOverlay extends Overlay {
         return df.format(value);
     }
     @Inject
+    private TooltipManager tooltipManager;
+    @Inject
+    private Client client;
+    @Inject
     private ProfitTrackerOverlay(ProfitTrackerConfig config)
     {
         setPosition(OverlayPosition.ABOVE_CHATBOX_RIGHT);
@@ -33,6 +42,7 @@ public class ProfitTrackerOverlay extends Overlay {
         ptConfig = config;
         startTimeMillies = 0;
         inProfitTrackSession = false;
+        hasBankData = false;
     }
 
     /**
@@ -64,7 +74,7 @@ public class ProfitTrackerOverlay extends Overlay {
         // Build overlay title
         panelComponent.getChildren().add(TitleComponent.builder()
                 .text(titleText)
-                .color(Color.GREEN)
+                .color(hasBankData ? Color.GREEN : Color.YELLOW)
                 .build());
 
         if (!inProfitTrackSession)
@@ -76,6 +86,17 @@ public class ProfitTrackerOverlay extends Overlay {
                     .color(Color.RED)
                     .build());
 
+        }
+
+        // Show tooltip warning on mouse hover if user hasn't opened bank yet
+        Point mousePoint = new Point(client.getMouseCanvasPosition().getX(),client.getMouseCanvasPosition().getY());
+        if(this.getBounds().contains(mousePoint) && ! hasBankData)
+        {
+            String tooltipString =
+                    "Open bank first to ensure accurate tracking.</br>" +
+                    "Otherwise, GE offer interaction or emptying containers from deposit boxes may be incorrect.";
+
+            tooltipManager.add(new Tooltip(tooltipString));
         }
 
         // Set the size of the overlay (width)
@@ -128,6 +149,13 @@ public class ProfitTrackerOverlay extends Overlay {
     {
         SwingUtilities.invokeLater(() ->
                 inProfitTrackSession = true
+        );
+    }
+
+    public void setBankStatus(boolean bankReady)
+    {
+        SwingUtilities.invokeLater(() ->
+                hasBankData = bankReady
         );
     }
 
