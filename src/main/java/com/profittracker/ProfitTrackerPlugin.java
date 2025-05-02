@@ -57,6 +57,8 @@ public class ProfitTrackerPlugin extends Plugin
     // This ensures using a deposit box doesn't spam coin drops, but also doesn't get out of sync when the race
     // condition with menu options and container changes causes some anyway
     private boolean depositingItem;
+    // State of a deposit box being open, used to avoid tracking profit changes when just sending to the bank
+    private boolean depositBoxOpened;
     private long depositDeficit;
     private final int[] RUNE_POUCH_VARBITS = {
             VarbitID.RUNE_POUCH_QUANTITY_1,
@@ -236,7 +238,7 @@ public class ProfitTrackerPlugin extends Plugin
             tickProfit = calculateTickProfit();
 
             // accumulate profit
-            if (depositingItem){
+            if (depositingItem || depositBoxOpened){
                 // Track a deficit for deposits because of deposit box problems
                 depositDeficit += tickProfit;
                 depositingItem = false;
@@ -268,27 +270,37 @@ public class ProfitTrackerPlugin extends Plugin
     @Subscribe
     public void onWidgetLoaded(WidgetLoaded event)
     {
-        if (event.getGroupId() == InterfaceID.GE_COLLECT ||
-                event.getGroupId() == InterfaceID.GE_OFFERS) {
-            inventoryValueObject.setOffers(client.getGrandExchangeOffers());
-            grandExchangeOpened = true;
+        switch (event.getGroupId()) {
+            case InterfaceID.GE_COLLECT:
+            case InterfaceID.GE_OFFERS:
+                inventoryValueObject.setOffers(client.getGrandExchangeOffers());
+                grandExchangeOpened = true;
+                break;
+            case InterfaceID.BANK_DEPOSITBOX:
+                depositBoxOpened = true;
         }
     }
 
     @Subscribe
     public void onWidgetClosed(WidgetClosed event)
     {
-        //Catch untracked storage closing, as tick perfect close can cause onItemContainerChanged to not see the change
-        if (event.getGroupId() == InterfaceID.HUNTSMANS_KIT || //Huntsman's kit
-            event.getGroupId() == InterfaceID.SEED_VAULT) { // Seed vault
-            bankJustClosed = true;
-        }
-        if (event.getGroupId() == InterfaceID.GE_COLLECT ||
-                event.getGroupId() == InterfaceID.GE_OFFERS) {
-            grandExchangeOpened = false;
+        switch (event.getGroupId()) {
+            //Catch untracked storage closing, as tick perfect close can cause onItemContainerChanged to not see the change
+            case InterfaceID.HUNTSMANS_KIT:
+            case InterfaceID.SEED_VAULT:
+                bankJustClosed = true;
+                break;
+            case InterfaceID.GE_COLLECT:
+            case InterfaceID.GE_OFFERS:
+                grandExchangeOpened = false;
+                break;
+            case InterfaceID.BANK_DEPOSITBOX:
+                depositBoxOpened = false;
+                // Negates problems with closing box and depositing same tick
+                depositingItem = true;
+                break;
         }
     }
-
 
     private long calculateTickProfit()
     {
