@@ -428,6 +428,14 @@ public class ProfitTrackerPlugin extends Plugin
             }
         }
 
+        String[] collectionMenuOptions = {"Collect to bank", "Bank"};
+        for (String collectionMenuOption : collectionMenuOptions) {
+            if (menuOption.startsWith(collectionMenuOption) && grandExchangeOpened) {
+                depositingItem = true;
+                break;
+            }
+        }
+
         // Container items
         // Ignore profit changes for items that act as storage only
         switch (event.getItemId()) {
