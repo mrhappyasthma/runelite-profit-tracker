@@ -51,6 +51,8 @@ public class ProfitTrackerPlugin extends Plugin
     private boolean runePouchContentsChanged;
     // Remembers if the bank was open last tick, because tick perfect bank close reports changes late
     private boolean bankJustClosed;
+    // Remembers if untracked storage was open last tick, as tick perfect close reports changes late
+    private boolean storageJustClosed;
     // Remembers the state of grand exchange
     private boolean grandExchangeOpened;
     // Set when using a deposit menu option. Used to create a depositing deficit for the next time you open bank
@@ -225,21 +227,20 @@ public class ProfitTrackerPlugin extends Plugin
 
         checkAccount();
 
-        // Interacting with bank
-        // itemContainerChanged does not report bank change if closed on same tick
-        boolean skipOnce = bankJustClosed;
-        bankJustClosed = false;
-
         if (inventoryValueChanged || runePouchContentsChanged || bankValueChanged || grandExchangeValueChanged)
         {
-            if (skipOnce) {
+            // Interacting with bank
+            // itemContainerChanged does not report bank change if closed on same tick
+            if (storageJustClosed) {
                 skipTickForProfitCalculation = true;
             }
+
             tickProfit = calculateTickProfit();
 
             // accumulate profit
-            if (depositingItem || depositBoxOpened){
+            if (depositingItem || depositBoxOpened || bankJustClosed){
                 // Track a deficit for deposits because of deposit box problems
+                // Include bank last tick close just to prevent confusing xp drops, even though they re-sync on open
                 depositDeficit += tickProfit;
                 depositingItem = false;
                 tickProfit = 0;
@@ -265,6 +266,8 @@ public class ProfitTrackerPlugin extends Plugin
             runePouchContentsChanged = false;
             grandExchangeValueChanged = false;
         }
+        bankJustClosed = false;
+        storageJustClosed = false;
     }
 
     @Subscribe
@@ -274,8 +277,12 @@ public class ProfitTrackerPlugin extends Plugin
             case InterfaceID.GE_COLLECT:
             case InterfaceID.GE_OFFERS:
                 inventoryValueObject.setOffers(client.getGrandExchangeOffers());
+                if (previousPossessions.grandExchangeItems == null) {
+                    previousPossessions.grandExchangeItems = inventoryValueObject.getGrandExchangeContents();
+                }
                 grandExchangeOpened = true;
                 break;
+            case InterfaceID.BANK_DEPOSIT_IMP:
             case InterfaceID.BANK_DEPOSITBOX:
                 depositBoxOpened = true;
         }
@@ -285,15 +292,19 @@ public class ProfitTrackerPlugin extends Plugin
     public void onWidgetClosed(WidgetClosed event)
     {
         switch (event.getGroupId()) {
+            case InterfaceID.BANKMAIN:
+                bankJustClosed = true;
+                break;
             //Catch untracked storage closing, as tick perfect close can cause onItemContainerChanged to not see the change
             case InterfaceID.HUNTSMANS_KIT:
             case InterfaceID.SEED_VAULT:
-                bankJustClosed = true;
+                storageJustClosed = true;
                 break;
             case InterfaceID.GE_COLLECT:
             case InterfaceID.GE_OFFERS:
                 grandExchangeOpened = false;
                 break;
+            case InterfaceID.BANK_DEPOSIT_IMP:
             case InterfaceID.BANK_DEPOSITBOX:
                 depositBoxOpened = false;
                 // Negates problems with closing box and depositing same tick
@@ -448,6 +459,11 @@ public class ProfitTrackerPlugin extends Plugin
             }
         }
 
+        // Imp in a box acts like a deposit box, both via interface, and use interaction
+        if (menuOption.startsWith("Use") && event.getMenuTarget().contains("Imp-in-a-box(")){
+            depositingItem = true;
+        }
+
         // Container items
         // Ignore profit changes for items that act as storage only
         switch (event.getItemId()) {
@@ -479,7 +495,7 @@ public class ProfitTrackerPlugin extends Plugin
             case ItemID.GEM_BAG: //Fill, empty, open | empty
             case ItemID.SLAYER_HERB_SACK: // Fill, empty, open | empty
 
-            case ItemID.SEED_BOX: // Open
+            case ItemID.SEED_BOX: // Fill, Empty, Check, Open
 
             case ItemID.HG_MEATPOUCH_SMALL: // Fill, Empty
             case ItemID.HG_MEATPOUCH_LARGE: // Fill, Empty
@@ -557,7 +573,7 @@ public class ProfitTrackerPlugin extends Plugin
             case ItemID.COAL_BAG_OPEN: // Fill, Empty
 
             case ItemID.SLAYER_HERB_SACK_OPEN:
-            case ItemID.SEED_BOX_OPEN:
+            case ItemID.SEED_BOX_OPEN: //Fill, Empty, Check, Close
 
             case ItemID.LOG_BASKET_OPEN:
             case ItemID.FORESTRY_BASKET_OPEN:
