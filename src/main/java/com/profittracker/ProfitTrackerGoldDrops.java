@@ -337,11 +337,12 @@ public class ProfitTrackerGoldDrops {
         {
             return "ALOT";
         }
+        double resultValue = Long.signum(goldDropValue) * Math.floor(Math.abs(goldValueRep) * 10) / 10;
         if(useDecimal)
         {
-            return String.format("%.1f%s", Math.floor(goldValueRep * 10) / 10, suffix);
+            return String.format("%.1f%s", resultValue, suffix);
         }else{
-            return String.format("%.0f%s", Math.floor(goldValueRep * 10) / 10, suffix);
+            return String.format("%.0f%s", resultValue, suffix);
         }
     }
 }
