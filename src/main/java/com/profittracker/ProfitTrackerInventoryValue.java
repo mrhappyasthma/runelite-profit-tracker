@@ -313,21 +313,19 @@ public class ProfitTrackerInventoryValue {
         Item[] extraItems = new Item[0];
         Item[] resultItems = items.clone();
         for (int i = 0; i < resultItems.length; i++){
+            boolean replaceItem = true;
             switch (resultItems[i].getId()){
                 case ItemID.MINNOW:
                     extraItems = ArrayUtils.add(extraItems,new Item(ItemID.RAW_SHARK,resultItems[i].getQuantity() / 40));
-                    resultItems[i] = new Item(-1,0);
                     break;
                 //Mark of grace for amylase crystals seems to be covered already by the GE value checker
                 case ItemID.VARLAMORE_WYRM_AGILITY_TERMITE:
                     extraItems = ArrayUtils.add(extraItems,new Item(ItemID.AMYLASE,resultItems[i].getQuantity()));
-                    resultItems[i] = new Item(-1,0);
                     break;
-                case ItemID.AGILITYARENA_TICKET: //Old agility arena ticker for pirate's hook
+                case ItemID.AGILITYARENA_TICKET: //Old agility arena ticket for pirate's hook
                 case ItemID.AGILITYARENA_VOUCHER: //Brimhaven voucher for pirate's hook
-                    int hookValue = (int) calculateItemValue(new Item(ItemID.PIRATEHOOK, 1));
-                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.COINS,resultItems[i].getQuantity() * hookValue / 800));
-                    resultItems[i] = new Item(-1,0);
+                    long hookValue = calculateItemValue(new Item(ItemID.PIRATEHOOK, 1));
+                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.COINS,(int)(resultItems[i].getQuantity() * hookValue / 800)));
                     break;
                 case ItemID.STAR_DUST:
                 case ItemID.STAR_DUST_25:
@@ -335,48 +333,65 @@ public class ProfitTrackerInventoryValue {
                 case ItemID.STAR_DUST_125:
                 case ItemID.STAR_DUST_175:
                     extraItems = ArrayUtils.add(extraItems,new Item(ItemID.SOFTCLAY,resultItems[i].getQuantity() * 2 / 3));
-                    resultItems[i] = new Item(-1,0);
                     break;
                 case ItemID.MOTHERLODE_NUGGET:
                 case ItemID.MGUILD_MINERALS:
                     extraItems = ArrayUtils.add(extraItems,new Item(ItemID.SOFTCLAY,resultItems[i].getQuantity() * 10));
-                    resultItems[i] = new Item(-1,0);
                     break;
                 case ItemID.FORESTRY_CURRENCY: //Anima bark for felling axe handle
-                    int handleValue = (int)(calculateItemValue(new Item(ItemID.FORESTRY_2H_AXE_HANDLE, 1)) - calculateItemValue(new Item(ItemID.OAK_LOGS, 500)));
-                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.COINS,resultItems[i].getQuantity() * handleValue / 10000));
-                    resultItems[i] = new Item(-1,0);
+                    long handleValue = calculateItemValue(new Item(ItemID.FORESTRY_2H_AXE_HANDLE, 1)) - calculateItemValue(new Item(ItemID.OAK_LOGS, 500));
+                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.COINS,(int)(resultItems[i].getQuantity() * handleValue / 10000)));
                     break;
                 case ItemID.PRIF_CRYSTAL_SHARD: //Crystal shard high alch
                     extraItems = ArrayUtils.add(extraItems,new Item(ItemID.COINS,resultItems[i].getQuantity() * 6000));
-                    resultItems[i] = new Item(-1,0);
                     break;
                 case ItemID.PRIF_CRYSTAL_SHARD_CRUSHED:
                     // Profit from making divine super combat, used for crystal shards/dust
-                    int potionProfit = (int)(calculateItemValue(new Item(ItemID._4DOSEDIVINECOMBAT, 1)) - calculateItemValue(new Item(ItemID._4DOSE2COMBAT,1)));
-                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.COINS,resultItems[i].getQuantity() * potionProfit / 4));
-                    resultItems[i] = new Item(-1,0);
+                    long potionProfit = calculateItemValue(new Item(ItemID._4DOSEDIVINECOMBAT, 1)) - calculateItemValue(new Item(ItemID._4DOSE2COMBAT,1));
+                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.COINS,(int)(resultItems[i].getQuantity() * potionProfit / 4)));
                     break;
                 case ItemID.TZHAAR_TOKEN: //Tokkul for onyx
-                    int onyxValue = (int) calculateItemValue(new Item(ItemID.ONYX, 1));
-                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.COINS,resultItems[i].getQuantity() * onyxValue / 300000));
-                    resultItems[i] = new Item(-1,0);
+                    long onyxValue = calculateItemValue(new Item(ItemID.ONYX, 1));
+                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.COINS,(int)(resultItems[i].getQuantity() * onyxValue / 300000)));
                     break;
                 case ItemID.ABYSSAL_PEARL: //Abyssal pearls for ring of the elements
-                    int roteValue = (int) calculateItemValue(new Item(ItemID.RING_OF_ELEMENTS, 1));
-                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.COINS,resultItems[i].getQuantity() * roteValue / 400));
-                    resultItems[i] = new Item(-1,0);
+                    long roteValue = calculateItemValue(new Item(ItemID.RING_OF_ELEMENTS, 1));
+                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.COINS,(int)(resultItems[i].getQuantity() * roteValue / 400)));
                     break;
                 case ItemID.VILLAGE_TRADE_STICKS: //Trading sticks for gout tubers
-                    int tuberValue = (int) calculateItemValue(new Item(ItemID.VILLAGE_RARE_TUBER, 1));
-                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.COINS,resultItems[i].getQuantity() * tuberValue / 120));
-                    resultItems[i] = new Item(-1,0);
+                    long tuberValue = calculateItemValue(new Item(ItemID.VILLAGE_RARE_TUBER, 1));
+                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.COINS,(int)(resultItems[i].getQuantity() * tuberValue / 120)));
                     break;
                 case ItemID.FOSSIL_MERMAID_TEAR: //Mermaid tears for merfolk trident
-                    int tridentValue = (int) calculateItemValue(new Item(ItemID.MERFOLK_TRIDENT, 1));
-                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.COINS,resultItems[i].getQuantity() * tridentValue / 400));
-                    resultItems[i] = new Item(-1,0);
+                    long tridentValue = calculateItemValue(new Item(ItemID.MERFOLK_TRIDENT, 1));
+                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.COINS,(int)(resultItems[i].getQuantity() * tridentValue / 400)));
                     break;
+                case ItemID.KONAR_KEY: //Brimstone key high alch
+                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.COINS,(int)(resultItems[i].getQuantity() * 48000)));
+                    break;
+                case ItemID.BIRD_EGG_BLUE: //Bird eggs can be traded in for seed nests
+                case ItemID.BIRD_EGG_RED:
+                case ItemID.BIRD_EGG_GREEN:
+                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.BIRD_NEST_EMPTY,resultItems[i].getQuantity()));
+                    break;
+                case ItemID.BIRD_NEST_EGG_BLUE:
+                case ItemID.BIRD_NEST_EGG_RED:
+                case ItemID.BIRD_NEST_EGG_GREEN:
+                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.BIRD_NEST_EMPTY,resultItems[i].getQuantity() * 2));
+                    break;
+                case ItemID.MAGIC_IMP_BOX_FULL:
+                case ItemID.MAGIC_IMP_BOX_HALF:
+                    //Replace un-tradeable magic imp boxes with regular ones for value check
+                    //Otherwise using them and opening the bank would cause confusing small profits
+                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.MAGIC_IMP_BOX,resultItems[i].getQuantity()));
+                    break;
+                //TODO Seedlings: Have unwatered seedlings turn into the seed + pot, and the watered versions into saplings
+                default:
+                    replaceItem = false;
+                    break;
+            }
+            if (replaceItem) {
+                resultItems[i] = new Item(-1,0);
             }
         }
         return ArrayUtils.addAll(resultItems,extraItems);
