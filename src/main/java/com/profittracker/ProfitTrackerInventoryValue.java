@@ -426,6 +426,14 @@ public class ProfitTrackerInventoryValue {
      * @return Array of items with quantity set to the difference
      */
     public Item[] getItemCollectionDifference(Item[] originalItems, Item[] newItems){
+        if (config.estimateUntradeables()){
+            //Replace untradeables with their equivalent items.
+            //The replaceUntradeables function is inaccurate for very small amounts, so we need to perform it over the source
+            //with larger quantities instead of over the result difference between collections which generally is just 1 item.
+            //For example, a single stardust = 2/3rds of a soft clay, which is smaller than 1, and so its quantity is truncated by the Item object.
+            originalItems = replaceUntradeables(originalItems);
+            newItems = replaceUntradeables(newItems);
+        }
         Map<Integer, Integer> originalItemList = mapItemArray(originalItems);
         Map<Integer, Integer> newItemList = mapItemArray(newItems);
         //Subtract old quantities from new to get difference
