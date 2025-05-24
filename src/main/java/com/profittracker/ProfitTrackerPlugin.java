@@ -53,6 +53,8 @@ public class ProfitTrackerPlugin extends Plugin
     private boolean bankJustClosed;
     // Remembers if untracked storage was open last tick, as tick perfect close reports changes late
     private boolean storageJustClosed;
+    // State boolean for when a widget we do not fully track is currently opened, such as the leprechaun tool store
+    private boolean untrackedStorageOpened;
     // Remembers the state of grand exchange
     private boolean grandExchangeOpened;
     // Set when using a deposit menu option. Used to create a depositing deficit for the next time you open bank
@@ -231,7 +233,7 @@ public class ProfitTrackerPlugin extends Plugin
         {
             // Interacting with bank
             // itemContainerChanged does not report bank change if closed on same tick
-            if (storageJustClosed) {
+            if (storageJustClosed || untrackedStorageOpened) {
                 skipTickForProfitCalculation = true;
             }
 
@@ -285,6 +287,10 @@ public class ProfitTrackerPlugin extends Plugin
             case InterfaceID.BANK_DEPOSIT_IMP:
             case InterfaceID.BANK_DEPOSITBOX:
                 depositBoxOpened = true;
+                break;
+            case InterfaceID.FARMING_TOOLS:
+                untrackedStorageOpened = true;
+                break;
         }
     }
 
@@ -309,6 +315,10 @@ public class ProfitTrackerPlugin extends Plugin
                 depositBoxOpened = false;
                 // Negates problems with closing box and depositing same tick
                 depositingItem = true;
+                break;
+            case InterfaceID.FARMING_TOOLS:
+                untrackedStorageOpened = false;
+                storageJustClosed = true;
                 break;
         }
     }
