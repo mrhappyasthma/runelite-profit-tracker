@@ -304,6 +304,7 @@ public class ProfitTrackerPlugin extends Plugin
             //Catch untracked storage closing, as tick perfect close can cause onItemContainerChanged to not see the change
             case InterfaceID.HUNTSMANS_KIT:
             case InterfaceID.SEED_VAULT:
+            case InterfaceID.TACKLE_BOX_MAIN:
                 storageJustClosed = true;
                 break;
             case InterfaceID.GE_COLLECT:
@@ -414,9 +415,11 @@ public class ProfitTrackerPlugin extends Plugin
         }
 
         // In these events, inventory WILL be changed, but we DON'T want to calculate profit!
-        if (containerId == InventoryID.HUNTSMANS_KIT || // Huntsman's kit
-            containerId == InventoryID.SEED_VAULT) { // Seed vault
-            skipTickForProfitCalculation = true;
+        switch (containerId){
+            case InventoryID.HUNTSMANS_KIT:
+            case InventoryID.SEED_VAULT:
+            case InventoryID.TACKLE_BOX:
+                skipTickForProfitCalculation = true;
         }
 
         // No container event occurs for the GE collection item containers, but inventory does
