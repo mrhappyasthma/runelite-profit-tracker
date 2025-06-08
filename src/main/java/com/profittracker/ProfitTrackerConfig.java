@@ -86,7 +86,7 @@ public interface ProfitTrackerConfig extends Config
     @ConfigItem(
             keyName = "onlineOnlyRate",
             name = "Online only rate",
-            description = "Show profit rate only for time spent logged in. Timer pacing will be uneven due to updating every tick.",
+            description = "Show profit rate only for time spent logged in.",
             section = visualSettings
     )
     default boolean onlineOnlyRate()

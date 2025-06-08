@@ -1,5 +1,6 @@
 package com.profittracker;
 import net.runelite.api.Client;
+import net.runelite.api.MenuAction;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.components.LineComponent;
@@ -20,11 +21,15 @@ public class ProfitTrackerOverlay extends Overlay {
     private long profitValue;
     private long startTimeMillies;
     private long activeTicks;
+    private long lastTickMillies;
     private boolean inProfitTrackSession;
     private boolean hasBankData;
 
     private final ProfitTrackerConfig ptConfig;
+    private final ProfitTrackerPlugin ptPlugin;
     private final PanelComponent panelComponent = new PanelComponent();
+
+    private static final String RESET_MENU_OPTION = "Reset";
 
     public static String FormatIntegerWithCommas(long value) {
         DecimalFormat df = new DecimalFormat("###,###,###");
@@ -35,15 +40,22 @@ public class ProfitTrackerOverlay extends Overlay {
     @Inject
     private Client client;
     @Inject
-    private ProfitTrackerOverlay(ProfitTrackerConfig config)
+    private ProfitTrackerOverlay(ProfitTrackerConfig config, ProfitTrackerPlugin trackerPlugin)
     {
         setPosition(OverlayPosition.ABOVE_CHATBOX_RIGHT);
         profitValue = 0L;
         ptConfig = config;
         startTimeMillies = 0;
         activeTicks = 0;
+        lastTickMillies = 0;
         inProfitTrackSession = false;
         hasBankData = false;
+        ptPlugin = trackerPlugin;
+        this.addMenuEntry(MenuAction.RUNELITE_OVERLAY, RESET_MENU_OPTION, "Profit Tracker",menuEntry ->
+                {
+                    ptPlugin.resetSession();
+                    profitValue = 0;
+                });
     }
 
     /**
@@ -54,24 +66,28 @@ public class ProfitTrackerOverlay extends Overlay {
     @Override
     public Dimension render(Graphics2D graphics) {
         String titleText = "Profit Tracker:";
-        long secondsElapsed;
+        long millisecondsElapsed;
         long profitRateValue;
 
         if (startTimeMillies > 0)
         {
             if (ptConfig.onlineOnlyRate()){
-                secondsElapsed = (long)(activeTicks * 0.6);
+                millisecondsElapsed = (long)(Math.max(0,activeTicks - 1)  * 600);
+                //Add duration since last tick to ensure timer pacing isn't uneven
+                if (lastTickMillies != 0){
+                    millisecondsElapsed += System.currentTimeMillis() - lastTickMillies;
+                }
             }else{
-                secondsElapsed = (System.currentTimeMillis() - startTimeMillies) / 1000;
+                millisecondsElapsed = (System.currentTimeMillis() - startTimeMillies);
             }
         }
         else
         {
             // there was never any session
-            secondsElapsed = 0;
+            millisecondsElapsed = 0;
         }
 
-        profitRateValue = calculateProfitHourly(secondsElapsed, profitValue);
+        profitRateValue = calculateProfitHourly(millisecondsElapsed, profitValue);
 
         // Not sure how this can occur, but it was recommended to do so
         panelComponent.getChildren().clear();
@@ -112,7 +128,7 @@ public class ProfitTrackerOverlay extends Overlay {
         // elapsed time
         panelComponent.getChildren().add(LineComponent.builder()
                 .left("Time:")
-                .right(formatTimeIntervalFromSec(secondsElapsed))
+                .right(formatTimeIntervalFromMs(millisecondsElapsed, false))
                 .build());
 
         // Profit
@@ -150,9 +166,12 @@ public class ProfitTrackerOverlay extends Overlay {
         );
     }
 
-    public void updateActiveTicks() {
+    public void updateActiveTicks(final long newValue) {
         SwingUtilities.invokeLater(() ->
-                activeTicks += 1
+                {
+                    activeTicks = newValue;
+                    lastTickMillies = System.currentTimeMillis();
+                }
         );
     }
 
@@ -170,34 +189,39 @@ public class ProfitTrackerOverlay extends Overlay {
         );
     }
 
-    private static String formatTimeIntervalFromSec(final long totalSecElapsed)
+    private static String formatTimeIntervalFromMs(final long totalMsElapsed, boolean showMilliseconds)
     {
         /*
         elapsed seconds to format HH:MM:SS
          */
-        final long sec = totalSecElapsed % 60;
-        final long min = (totalSecElapsed / 60) % 60;
-        final long hr = totalSecElapsed / 3600;
+        final long ms = totalMsElapsed % 1000;
+        final long sec = totalMsElapsed / 1000 % 60;
+        final long min = (totalMsElapsed / 60000) % 60;
+        final long hr = totalMsElapsed / 3600000;
 
-        return String.format("%02d:%02d:%02d", hr, min, sec);
+        if (showMilliseconds) {
+            return String.format("%02d:%02d:%02d.%03d", hr, min, sec, ms);
+        }else{
+            return String.format("%02d:%02d:%02d", hr, min, sec);
+        }
     }
 
-    static long calculateProfitHourly(long secondsElapsed, long profit)
+    static long calculateProfitHourly(long millisecondsElapsed, long profit)
     {
         long averageProfitThousandForHour;
-        double averageProfitForSecond;
+        double averageProfitPerMillisecond;
 
-        if (secondsElapsed > 0)
+        if (millisecondsElapsed > 0)
         {
-            averageProfitForSecond = (double)profit / secondsElapsed;
+            averageProfitPerMillisecond = (double)profit / millisecondsElapsed;
         }
         else
         {
             // can't divide by zero, not enough time has passed
-            averageProfitForSecond = 0;
+            averageProfitPerMillisecond = 0;
         }
 
-        averageProfitThousandForHour = (long)(averageProfitForSecond * 3600) / 1000;
+        averageProfitThousandForHour = (long)(averageProfitPerMillisecond * 3600);
 
         return averageProfitThousandForHour;
     }

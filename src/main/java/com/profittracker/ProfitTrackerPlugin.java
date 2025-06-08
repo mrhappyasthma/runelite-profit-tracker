@@ -26,7 +26,9 @@ import java.util.Map;
 
 @Slf4j
 @PluginDescriptor(
-        name = "Profit Tracker"
+        name = "Profit Tracker",
+        description = "Tracks profit according to the GE value of your items.",
+        tags = {"overlay"}
 )
 public class ProfitTrackerPlugin extends Plugin
 {
@@ -42,6 +44,7 @@ public class ProfitTrackerPlugin extends Plugin
     private long totalProfit;
 
     private long startTickMillis;
+    private long activeTicks;
 
     private boolean skipTickForProfitCalculation;
     private boolean inventoryValueChanged;
@@ -122,6 +125,7 @@ public class ProfitTrackerPlugin extends Plugin
 
         // this will be filled with actual information in startProfitTrackingSession
         startTickMillis = 0;
+        activeTicks = 0;
 
         // skip profit calculation for first tick, to initialize first inventory value
         skipTickForProfitCalculation = true;
@@ -156,9 +160,17 @@ public class ProfitTrackerPlugin extends Plugin
 
         overlay.updateStartTimeMillies(startTickMillis);
 
+        overlay.updateActiveTicks(activeTicks);
+
         overlay.startSession();
 
         inProfitTrackSession = true;
+    }
+
+    public void resetSession(){
+        initializeVariables();
+        startProfitTrackingSession();
+        inventoryValueChanged = true;
     }
 
     /**
@@ -228,7 +240,8 @@ public class ProfitTrackerPlugin extends Plugin
         }
 
         checkAccount();
-        overlay.updateActiveTicks();
+        activeTicks += 1;
+        overlay.updateActiveTicks(activeTicks);
 
         if (inventoryValueChanged || runePouchContentsChanged || bankValueChanged || grandExchangeValueChanged)
         {
