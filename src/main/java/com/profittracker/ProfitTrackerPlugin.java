@@ -228,6 +228,7 @@ public class ProfitTrackerPlugin extends Plugin
         }
 
         checkAccount();
+        overlay.updateActiveTicks();
 
         if (inventoryValueChanged || runePouchContentsChanged || bankValueChanged || grandExchangeValueChanged)
         {

@@ -5,7 +5,6 @@ import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.components.LineComponent;
 import net.runelite.client.ui.overlay.components.PanelComponent;
 import net.runelite.client.ui.overlay.components.TitleComponent;
-import net.runelite.client.ui.overlay.components.TooltipComponent;
 import net.runelite.client.ui.overlay.tooltip.Tooltip;
 import net.runelite.client.ui.overlay.tooltip.TooltipManager;
 
@@ -20,6 +19,7 @@ import java.text.DecimalFormat;
 public class ProfitTrackerOverlay extends Overlay {
     private long profitValue;
     private long startTimeMillies;
+    private long activeTicks;
     private boolean inProfitTrackSession;
     private boolean hasBankData;
 
@@ -41,6 +41,7 @@ public class ProfitTrackerOverlay extends Overlay {
         profitValue = 0L;
         ptConfig = config;
         startTimeMillies = 0;
+        activeTicks = 0;
         inProfitTrackSession = false;
         hasBankData = false;
     }
@@ -58,7 +59,11 @@ public class ProfitTrackerOverlay extends Overlay {
 
         if (startTimeMillies > 0)
         {
-            secondsElapsed = (System.currentTimeMillis() - startTimeMillies) / 1000;
+            if (ptConfig.onlineOnlyRate()){
+                secondsElapsed = (long)(activeTicks * 0.6);
+            }else{
+                secondsElapsed = (System.currentTimeMillis() - startTimeMillies) / 1000;
+            }
         }
         else
         {
@@ -142,6 +147,12 @@ public class ProfitTrackerOverlay extends Overlay {
     public void updateStartTimeMillies(final long newValue) {
         SwingUtilities.invokeLater(() ->
                 startTimeMillies = newValue
+        );
+    }
+
+    public void updateActiveTicks() {
+        SwingUtilities.invokeLater(() ->
+                activeTicks += 1
         );
     }
 
