@@ -173,9 +173,8 @@ public class ProfitTrackerGoldDrops {
             // reset text color for all regular xpdrops
             resetXpDropTextColor(dropTextWidget);
         }
-
-
     }
+
     private void xpDropToGoldDrop(Widget dropTextWidget, Widget dropSpriteWidget, long goldDropValue)
     {
         /*
@@ -184,7 +183,7 @@ public class ProfitTrackerGoldDrops {
 
         if (config.shortDrops()) {
             dropTextWidget.setText(formatGoldDropText(goldDropValue));
-        }else{
+        } else {
             // Remove disabled icon from string
             String formattedValue = dropTextWidget.getText();
             formattedValue = formattedValue.substring(formattedValue.indexOf("> ") + 2);
@@ -213,7 +212,7 @@ public class ProfitTrackerGoldDrops {
                     dropSpriteWidget.setSpriteId(COINS_SPRITE_ID_START - spriteIndex);
                 }
             }
-        }else{
+        } else {
             dropSpriteWidget.setSpriteId(COINS_SPRITE_ID_START - config.iconStyle().ordinal() + 1);
         }
     }
@@ -267,7 +266,14 @@ public class ProfitTrackerGoldDrops {
         String formattedAmount = formatGoldDropText(currentGoldDropValue);
 
         if (config.shortDrops()) {
-            //Use a value to slightly adjust sprite position, as manually setting text later doesn't adjust it
+            /*
+            Modifying the value of xpdrops later can cause substantial dead space between the text and sprite.
+            Passing a value into the runScript for xpdrops will set the sprite position based on the text sent
+            taking up more/less space. The particular character also makes minor adjustments, as the rendering is
+            not a monospace font. This could be eliminated if we can figure out how to reposition the sprite, or
+            eliminate the invisible error icon that causes the dead space, and get the rendered drop to recalculate
+            sprite position based on our custom text.
+             */
             int sizeAdjustingValue = 1;
             sizeAdjustingValue = formattedAmount.length() > 3 ? 6 : sizeAdjustingValue;
             sizeAdjustingValue = formattedAmount.length() > 4 ? 60 : sizeAdjustingValue;
@@ -341,7 +347,7 @@ public class ProfitTrackerGoldDrops {
         if(useDecimal)
         {
             return String.format("%.1f%s", resultValue, suffix);
-        }else{
+        } else {
             return String.format("%.0f%s", resultValue, suffix);
         }
     }

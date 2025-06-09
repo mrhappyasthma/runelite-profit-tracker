@@ -1,4 +1,5 @@
 package com.profittracker;
+import com.sun.org.apache.bcel.internal.Const;
 import net.runelite.api.Client;
 import net.runelite.api.MenuAction;
 import net.runelite.client.ui.overlay.Overlay;
@@ -30,6 +31,7 @@ public class ProfitTrackerOverlay extends Overlay {
     private final PanelComponent panelComponent = new PanelComponent();
 
     private static final String RESET_MENU_OPTION = "Reset";
+    private static final Integer MILLISECONDS_PER_TICK = 600;
 
     public static String FormatIntegerWithCommas(long value) {
         DecimalFormat df = new DecimalFormat("###,###,###");
@@ -72,12 +74,12 @@ public class ProfitTrackerOverlay extends Overlay {
         if (startTimeMillies > 0)
         {
             if (ptConfig.onlineOnlyRate()){
-                millisecondsElapsed = (long)(Math.max(0,activeTicks - 1)  * 600);
+                millisecondsElapsed = (long)(Math.max(0, activeTicks - 1)  * MILLISECONDS_PER_TICK);
                 //Add duration since last tick to ensure timer pacing isn't uneven
                 if (lastTickMillies != 0){
                     millisecondsElapsed += System.currentTimeMillis() - lastTickMillies;
                 }
-            }else{
+            } else {
                 millisecondsElapsed = (System.currentTimeMillis() - startTimeMillies);
             }
         }
@@ -201,7 +203,7 @@ public class ProfitTrackerOverlay extends Overlay {
 
         if (showMilliseconds) {
             return String.format("%02d:%02d:%02d.%03d", hr, min, sec, ms);
-        }else{
+        } else {
             return String.format("%02d:%02d:%02d", hr, min, sec);
         }
     }

@@ -20,7 +20,7 @@ For example, if you buy in a general shop, an item for 20 coins, which is worth 
 ProfitTracker will generate a gold drop animation of 200 coins.
 
 # How to use
-The plugin will begin tracking when entering the game. The session can be reset by using shift + right click on the overlay, or by reloading the plugin.
+The plugin will begin tracking when entering the game. The session can be reset by using shift + right-click on the overlay, or by reloading the plugin.
 
 Certain actions will not be recorded as profit unless the bank has been opened at least once to create a baseline, and again to see changes. Things like using a deposit box to empty storage pouches, or banking items directly from reward chests. So make sure to open up the bank once for better accuracy before doing those things.
 
