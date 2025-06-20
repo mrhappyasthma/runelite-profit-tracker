@@ -1,5 +1,4 @@
 package com.profittracker;
-import com.sun.org.apache.bcel.internal.Const;
 import net.runelite.api.Client;
 import net.runelite.api.MenuAction;
 import net.runelite.client.ui.overlay.Overlay;
@@ -31,7 +30,7 @@ public class ProfitTrackerOverlay extends Overlay {
     private final PanelComponent panelComponent = new PanelComponent();
 
     private static final String RESET_MENU_OPTION = "Reset";
-    private static final Integer MILLISECONDS_PER_TICK = 600;
+    private static final int MILLISECONDS_PER_TICK = 600;
 
     public static String FormatIntegerWithCommas(long value) {
         DecimalFormat df = new DecimalFormat("###,###,###");
