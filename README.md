@@ -2,8 +2,6 @@
  
  
 # Profit Tracker Plugin
-NOTE: I've stopped working on this, I will probably not fix much of the issues. People are welcome to fork or use the code.
-
 
 This runelite plugin tracks the profit you are generating, according to GE, while money-making.
 ![image](https://user-images.githubusercontent.com/8212109/94357201-5d4c1780-009f-11eb-9c73-17c279edd613.png)
