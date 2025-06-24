@@ -11,6 +11,7 @@ import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.api.gameval.VarbitID;
+import net.runelite.api.widgets.Widget;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.ItemManager;
@@ -633,10 +634,16 @@ public class ProfitTrackerPlugin extends Plugin
         return configManager.getConfig(ProfitTrackerConfig.class);
     }
 
-
     @Subscribe
     public void onScriptPreFired(ScriptPreFired scriptPreFired)
     {
         goldDropsObject.onScriptPreFired(scriptPreFired);
+
+    }
+
+    @Subscribe
+    public void onScriptPostFired(ScriptPostFired event)
+    {
+        goldDropsObject.onScriptPostFired(event);
     }
 }
