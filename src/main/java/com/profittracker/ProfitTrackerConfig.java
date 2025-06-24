@@ -40,6 +40,17 @@ public interface ProfitTrackerConfig extends Config
     }
 
     @ConfigItem(
+            keyName = "unhideGoldDrops",
+            name = "Unhide value changes",
+            description = "Prevents other plugins from hiding value changes if they are enabled.",
+            section = visualSettings
+    )
+    default boolean unhideGoldDrops()
+    {
+        return true;
+    }
+
+    @ConfigItem(
             keyName = "autoStart",
             name = "Automatically start tracking",
             description = "Automatically begin tracking profit on session start.",
