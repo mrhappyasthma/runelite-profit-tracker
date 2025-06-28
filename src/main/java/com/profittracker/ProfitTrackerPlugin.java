@@ -232,7 +232,7 @@ public class ProfitTrackerPlugin extends Plugin
     @Subscribe
     public void onRuneScapeProfileChanged(RuneScapeProfileChanged e)
     {
-        executor.execute(this::checkAccount);
+        checkAccount();
     }
 
     @Override
@@ -240,7 +240,6 @@ public class ProfitTrackerPlugin extends Plugin
     {
         // Remove the inventory overlay
         overlayManager.remove(overlay);
-
     }
 
     @Subscribe
