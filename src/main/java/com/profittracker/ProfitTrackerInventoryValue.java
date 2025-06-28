@@ -222,15 +222,17 @@ public class ProfitTrackerInventoryValue {
     public Item[] getInventoryAndEquipmentContents(){
         ItemContainer inventoryContainer = client.getItemContainer(InventoryID.INV);
         ItemContainer equipmentContainer = client.getItemContainer(InventoryID.WORN);
+        Item[] inventoryItems = new Item[0];
+        Item[] equipmentItems = new Item[0];
 
-        if (inventoryContainer == null || equipmentContainer == null)
-        {
-            return null;
+        if (inventoryContainer != null){
+            inventoryItems = inventoryContainer.getItems();
+        }
+        if (equipmentContainer != null){
+            equipmentItems = equipmentContainer.getItems();
         }
 
-        Item[] inventoryItems = inventoryContainer.getItems();
-        Item[] equipmentItems = equipmentContainer.getItems();
-        Item[] personItems = ArrayUtils.addAll(inventoryItems,equipmentItems);
+        Item[] personItems = ArrayUtils.addAll(inventoryItems, equipmentItems);
         // Expand to have runes from pouch as individual items
         return expandContainers(personItems);
     }
