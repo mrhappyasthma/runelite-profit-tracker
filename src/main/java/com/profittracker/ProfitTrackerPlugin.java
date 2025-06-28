@@ -1,5 +1,6 @@
 package com.profittracker;
 
+import com.google.gson.Gson;
 import com.google.inject.Provides;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +14,8 @@ import net.runelite.api.gameval.ItemID;
 import net.runelite.api.gameval.VarbitID;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ClientShutdown;
+import net.runelite.client.events.RuneScapeProfileChanged;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
@@ -21,8 +24,7 @@ import net.runelite.api.events.VarbitChanged;
 import org.apache.commons.lang3.ArrayUtils;
 
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.concurrent.ScheduledExecutorService;
 
 @Slf4j
 @PluginDescriptor(
@@ -37,8 +39,8 @@ public class ProfitTrackerPlugin extends Plugin
 
     // the profit will be calculated against this value
     private long prevInventoryValue;
-    private Map<String, ProfitTrackerPossessions> accountPossessions;
-    private ProfitTrackerPossessions previousPossessions;
+    // Holds session data for the current account
+    private ProfitTrackerRecord accountRecord;
     private String previousAccount;
     // Collection of items that was last used to calculate value, includes inventory and equipment
     private long totalProfit;
@@ -93,6 +95,15 @@ public class ProfitTrackerPlugin extends Plugin
     @Inject
     private ProfitTrackerOverlay overlay;
 
+    @Inject
+    private ConfigManager configManager;
+
+    @Inject
+    private Gson gson;
+
+    @Inject
+    private ScheduledExecutorService executor;
+
     @Override
     protected void startUp() throws Exception
     {
@@ -104,20 +115,10 @@ public class ProfitTrackerPlugin extends Plugin
         inventoryValueObject = new ProfitTrackerInventoryValue(client, itemManager, config);
 
         initializeVariables();
-
-        // start tracking only if plugin was re-started mid-game
-        if (client.getGameState() == GameState.LOGGED_IN)
-        {
-            startProfitTrackingSession();
-        }
-
     }
 
     private void initializeVariables()
     {
-        accountPossessions = new HashMap<>();
-        previousPossessions = null;
-        previousAccount = null;
         inventoryValueObject.setOffers(null);
 
         // profit begins at 0 of course
@@ -143,8 +144,6 @@ public class ProfitTrackerPlugin extends Plugin
         bankJustClosed = false;
 
         depositingItem = false;
-
-        depositDeficit = 0;
     }
 
     private void startProfitTrackingSession()
@@ -158,9 +157,13 @@ public class ProfitTrackerPlugin extends Plugin
         // initialize timer
         startTickMillis = System.currentTimeMillis();
 
+        activeTicks = 0;
+
         overlay.updateStartTimeMillies(startTickMillis);
 
         overlay.updateActiveTicks(activeTicks);
+
+        overlay.updateProfitValue(totalProfit);
 
         overlay.startSession();
 
@@ -171,6 +174,10 @@ public class ProfitTrackerPlugin extends Plugin
         initializeVariables();
         startProfitTrackingSession();
         inventoryValueChanged = true;
+        if (accountRecord != null) {
+            accountRecord.reset(configManager);
+            accountRecord.save(configManager, gson);
+        }
     }
 
     /**
@@ -179,30 +186,52 @@ public class ProfitTrackerPlugin extends Plugin
      */
     private void checkAccount()
     {
-        //Account for special worlds where a player with the same name might have different possessions
-        //For example, a speedrunning world has MEMBER and SPEEDRUNNING types
-        StringBuilder accountIdentifier = new StringBuilder(client.getLocalPlayer().getName());
-        WorldType[] worldTypes = client.getWorldType().toArray(new WorldType[0]);
-        for (WorldType worldType : worldTypes) {
-            accountIdentifier.append(worldType.name());
+        String accountIdentifier = ProfitTrackerRecord.getAccountRecordKey(client);
+        if (accountIdentifier == null) {
+            return;
+        }
+        boolean changedAccounts = previousAccount != null && ! previousAccount.contentEquals(accountIdentifier);
+
+        if (previousAccount != null && changedAccounts) {
+            // Changed account, save the items we know about
+            accountRecord.save(configManager, gson);
+            accountRecord = null;
         }
 
-        accountPossessions.putIfAbsent(accountIdentifier.toString(),new ProfitTrackerPossessions());
-        previousPossessions = accountPossessions.get(accountIdentifier.toString());
+        //configManager.getRSProfileConfigurationKeys(ProfitTrackerConfig.GROUP,configManager.getRSProfileKey(),"record_");
+        if (accountRecord == null) {
+            // Check for existing record
+            ProfitTrackerRecord record = ProfitTrackerRecord.load(client, configManager, gson);
+            if (! config.rememberProfit() && record != null) {
+                record.reset(configManager);
+            }
 
-        if (previousAccount == null || ! previousAccount.contentEquals(accountIdentifier)) {
-            if (client.getGameState() == GameState.LOGGED_IN && grandExchangeOpened)
-            {
-                inventoryValueObject.setOffers(client.getGrandExchangeOffers());
-                previousPossessions.grandExchangeItems = inventoryValueObject.getGrandExchangeContents();
+            if (record == null) {
+                // Create a new one if not found
+                accountRecord = new ProfitTrackerRecord(client);
             } else {
-                previousPossessions.grandExchangeItems = null;
+                accountRecord = record;
             }
         }
 
-        overlay.setBankStatus(previousPossessions.bankItems != null);
+        totalProfit = accountRecord.profitAccumulated;
+        activeTicks = accountRecord.ticksOnline;
+        startTickMillis = accountRecord.startTickMillies;
+        depositDeficit = accountRecord.depositDeficit;
 
-        previousAccount = accountIdentifier.toString();
+        overlay.updateProfitValue(totalProfit);
+        overlay.updateStartTimeMillies(startTickMillis);
+        overlay.updateActiveTicks(activeTicks);
+
+        overlay.setBankStatus(accountRecord.currentPossessions.bankItems != null);
+
+        previousAccount = accountIdentifier;
+    }
+
+    @Subscribe
+    public void onRuneScapeProfileChanged(RuneScapeProfileChanged e)
+    {
+        executor.execute(this::checkAccount);
     }
 
     @Override
@@ -231,16 +260,21 @@ public class ProfitTrackerPlugin extends Plugin
 
         if (!inProfitTrackSession)
         {
-            if (config.autoStart()){
-                startUp();
+            if (accountRecord != null && config.autoStart()){
+                overlay.startSession();
+                inProfitTrackSession = true;
                 inventoryValueChanged = true;
             } else {
                 return;
             }
         }
 
-        checkAccount();
+        if (accountRecord.name == null && client.getGameState() == GameState.LOGGED_IN) {
+            accountRecord.name = client.getLocalPlayer().getName();
+        }
+
         activeTicks += 1;
+        accountRecord.ticksOnline = activeTicks;
         overlay.updateActiveTicks(activeTicks);
 
         if (inventoryValueChanged || runePouchContentsChanged || bankValueChanged || grandExchangeValueChanged)
@@ -267,8 +301,10 @@ public class ProfitTrackerPlugin extends Plugin
                 tickProfit += depositDeficit;
                 depositDeficit = 0;
             }
+            accountRecord.depositDeficit = depositDeficit;
 
             totalProfit += tickProfit;
+            accountRecord.profitAccumulated = totalProfit;
             overlay.updateProfitValue(totalProfit);
 
             // generate gold drop
@@ -290,12 +326,16 @@ public class ProfitTrackerPlugin extends Plugin
     public void onWidgetLoaded(WidgetLoaded event)
     {
         switch (event.getGroupId()) {
+            case InterfaceID.BANKMAIN:
+                // Bank contents will be null if the bank has no items when first logging in
+                if (inventoryValueObject.getBankContents() == null && accountRecord.currentPossessions.bankItems == null) {
+                    accountRecord.updateBankItems(new Item[0]);
+                    overlay.setBankStatus(true);
+                }
+                break;
             case InterfaceID.GE_COLLECT:
             case InterfaceID.GE_OFFERS:
                 inventoryValueObject.setOffers(client.getGrandExchangeOffers());
-                if (previousPossessions.grandExchangeItems == null) {
-                    previousPossessions.grandExchangeItems = inventoryValueObject.getGrandExchangeContents();
-                }
                 grandExchangeOpened = true;
                 break;
             case InterfaceID.BANK_DEPOSIT_IMP:
@@ -349,7 +389,7 @@ public class ProfitTrackerPlugin extends Plugin
         Item[] newBankItems;
         Item[] newGrandExchangeItems = null;
         long newProfit;
-        Item[] possessionDifference;
+        Item[] possessionDifference = null;
         Item[] bankDifference;
         Item[] grandExchangeDifference;
 
@@ -360,19 +400,19 @@ public class ProfitTrackerPlugin extends Plugin
             newGrandExchangeItems = inventoryValueObject.getGrandExchangeContents();
         }
 
-        if (!skipTickForProfitCalculation && previousPossessions.inventoryItems != null && newInventoryItems != null)
+        if (!skipTickForProfitCalculation && accountRecord.currentPossessions.inventoryItems != null && newInventoryItems != null)
         {
             // calculate new profit
-            possessionDifference = inventoryValueObject.getItemCollectionDifference(previousPossessions.inventoryItems,newInventoryItems);
+            possessionDifference = inventoryValueObject.getItemCollectionDifference(accountRecord.currentPossessions.inventoryItems,newInventoryItems);
             newProfit = inventoryValueObject.calculateItemValue(possessionDifference);
-            if (previousPossessions.bankItems != null && newBankItems != null) {
-                bankDifference = inventoryValueObject.getItemCollectionDifference(previousPossessions.bankItems,newBankItems);
+            if (accountRecord.currentPossessions.bankItems != null && newBankItems != null) {
+                bankDifference = inventoryValueObject.getItemCollectionDifference(accountRecord.currentPossessions.bankItems,newBankItems);
                 // Profit is recalculated on all items instead of summed just in case item values could change between calculations
                 possessionDifference = ArrayUtils.addAll(possessionDifference,bankDifference);
                 newProfit = inventoryValueObject.calculateItemValue(possessionDifference);
             }
-            if (previousPossessions.grandExchangeItems != null && newGrandExchangeItems != null) {
-                grandExchangeDifference = inventoryValueObject.getItemCollectionDifference(previousPossessions.grandExchangeItems,newGrandExchangeItems);
+            if (accountRecord.currentPossessions.grandExchangeItems != null && newGrandExchangeItems != null) {
+                grandExchangeDifference = inventoryValueObject.getItemCollectionDifference(accountRecord.currentPossessions.grandExchangeItems,newGrandExchangeItems);
                 possessionDifference = ArrayUtils.addAll(possessionDifference,grandExchangeDifference);
                 newProfit = inventoryValueObject.calculateItemValue(possessionDifference);
             }
@@ -392,16 +432,21 @@ public class ProfitTrackerPlugin extends Plugin
 
         // update prevInventoryValue for future calculations anyway!
         //prevInventoryValue = newInventoryValue;
-        previousPossessions.inventoryItems = newInventoryItems;
+        accountRecord.updateInventoryItems(newInventoryItems);
         if (newBankItems != null) {
-            if (previousPossessions.bankItems == null) {
+            if (accountRecord.currentPossessions.bankItems == null) {
                 // If user hasn't opened bank yet, the deficit doesn't help us resync
                 depositDeficit = 0;
             }
-            previousPossessions.bankItems = newBankItems;
+            accountRecord.updateBankItems(newBankItems);
+            overlay.setBankStatus(accountRecord.currentPossessions.bankItems != null);
         }
         if (newGrandExchangeItems != null) {
-            previousPossessions.grandExchangeItems = newGrandExchangeItems;
+            accountRecord.updateGrandExchangeItems(newGrandExchangeItems);
+        }
+
+        if (newProfit != 0) {
+            accountRecord.lastPossessionChange = possessionDifference;
         }
 
         return newProfit;
@@ -438,6 +483,7 @@ public class ProfitTrackerPlugin extends Plugin
 
         // No container event occurs for the GE collection item containers, but inventory does
         if (grandExchangeOpened) {
+            inventoryValueObject.setOffers(client.getGrandExchangeOffers());
             grandExchangeValueChanged = true;
         }
     }
@@ -633,10 +679,15 @@ public class ProfitTrackerPlugin extends Plugin
         return configManager.getConfig(ProfitTrackerConfig.class);
     }
 
-
     @Subscribe
     public void onScriptPreFired(ScriptPreFired scriptPreFired)
     {
         goldDropsObject.onScriptPreFired(scriptPreFired);
+    }
+
+    @Subscribe
+    public void onClientShutdown(ClientShutdown event)
+    {
+        accountRecord.save(configManager, gson);
     }
 }

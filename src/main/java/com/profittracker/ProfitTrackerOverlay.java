@@ -75,7 +75,7 @@ public class ProfitTrackerOverlay extends Overlay {
             if (ptConfig.onlineOnlyRate()){
                 millisecondsElapsed = (long)(Math.max(0, activeTicks - 1)  * MILLISECONDS_PER_TICK);
                 //Add duration since last tick to ensure timer pacing isn't uneven
-                if (lastTickMillies != 0){
+                if (lastTickMillies != 0 && inProfitTrackSession){
                     millisecondsElapsed += System.currentTimeMillis() - lastTickMillies;
                 }
             } else {
@@ -163,7 +163,10 @@ public class ProfitTrackerOverlay extends Overlay {
      */
     public void updateStartTimeMillies(final long newValue) {
         SwingUtilities.invokeLater(() ->
-                startTimeMillies = newValue
+                {
+                    startTimeMillies = newValue;
+                    lastTickMillies = System.currentTimeMillis();
+                }
         );
     }
 
