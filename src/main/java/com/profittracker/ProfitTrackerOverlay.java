@@ -24,6 +24,8 @@ public class ProfitTrackerOverlay extends Overlay {
     private long lastTickMillies;
     private boolean inProfitTrackSession;
     private boolean hasBankData;
+    private String lastTimeDisplay;
+    private long lastProfitValue;
 
     private final ProfitTrackerConfig ptConfig;
     private final ProfitTrackerPlugin ptPlugin;
@@ -69,6 +71,7 @@ public class ProfitTrackerOverlay extends Overlay {
         String titleText = "Profit Tracker:";
         long millisecondsElapsed;
         long profitRateValue;
+        String timeText;
 
         if (startTimeMillies > 0)
         {
@@ -88,7 +91,16 @@ public class ProfitTrackerOverlay extends Overlay {
             millisecondsElapsed = 0;
         }
 
-        profitRateValue = calculateProfitHourly(millisecondsElapsed, profitValue);
+        timeText = formatTimeIntervalFromMs(millisecondsElapsed, false);
+        // Rate limit profit update to avoid extremely high profit being difficult to read
+        // Also reduces visual noise
+        if (! timeText.equals(lastTimeDisplay) || lastProfitValue == 0) {
+            profitRateValue = calculateProfitHourly(millisecondsElapsed, profitValue);
+            lastProfitValue = profitRateValue;
+        } else {
+            profitRateValue = lastProfitValue;
+        }
+        lastTimeDisplay = timeText;
 
         // Not sure how this can occur, but it was recommended to do so
         panelComponent.getChildren().clear();
@@ -129,7 +141,7 @@ public class ProfitTrackerOverlay extends Overlay {
         // elapsed time
         panelComponent.getChildren().add(LineComponent.builder()
                 .left("Time:")
-                .right(formatTimeIntervalFromMs(millisecondsElapsed, false))
+                .right(timeText)
                 .build());
 
         // Profit
@@ -153,7 +165,11 @@ public class ProfitTrackerOverlay extends Overlay {
      */
     public void updateProfitValue(final long newValue) {
         SwingUtilities.invokeLater(() ->
-            profitValue = newValue
+                {
+                    profitValue = newValue;
+                    // Value reset to ensure rate is shown immediately, instead of waiting for next time increment
+                    lastProfitValue = 0;
+                }
         );
     }
 
