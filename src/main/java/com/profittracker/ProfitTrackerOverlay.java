@@ -14,6 +14,9 @@ import javax.swing.*;
 import java.awt.*;
 
 import java.text.DecimalFormat;
+import java.util.Arrays;
+import java.util.Collections;
+
 /**
  * The ProfitTrackerOverlay class is used to display profit values for the user
  */
@@ -26,6 +29,7 @@ public class ProfitTrackerOverlay extends Overlay {
     private boolean hasBankData;
     private String lastTimeDisplay;
     private long lastProfitValue;
+    private int lastWidth;
 
     private final ProfitTrackerConfig ptConfig;
     private final ProfitTrackerPlugin ptPlugin;
@@ -133,9 +137,17 @@ public class ProfitTrackerOverlay extends Overlay {
             tooltipManager.add(new Tooltip(tooltipString));
         }
 
+        String formattedProfit = String.format("%,d",profitValue);
+        String formattedRate = String.format("%,d",profitRateValue) + "K/H";
+        int titleWidth = graphics.getFontMetrics().stringWidth(titleText) + 40;
+        int profitWidth = graphics.getFontMetrics().stringWidth("Profit:    " + formattedProfit);
+        int rateWidth = graphics.getFontMetrics().stringWidth("Rate:    " + formattedRate);
+        // Only allow width to grow, to avoid jitters at high values
+        lastWidth = Collections.max(Arrays.asList(lastWidth, titleWidth, profitWidth, rateWidth));
+
         // Set the size of the overlay (width)
         panelComponent.setPreferredSize(new Dimension(
-                graphics.getFontMetrics().stringWidth(titleText) + 40,
+                lastWidth,
                 0));
 
         // elapsed time
@@ -147,13 +159,13 @@ public class ProfitTrackerOverlay extends Overlay {
         // Profit
         panelComponent.getChildren().add(LineComponent.builder()
                 .left("Profit:")
-                .right(FormatIntegerWithCommas(profitValue))
+                .right(formattedProfit)
                 .build());
 
         // Profit Rate
         panelComponent.getChildren().add(LineComponent.builder()
                 .left("Rate:")
-                .right(profitRateValue + "K/H")
+                .right(formattedRate)
                 .build());
 
         return panelComponent.render(graphics);
@@ -198,7 +210,10 @@ public class ProfitTrackerOverlay extends Overlay {
     public void startSession()
     {
         SwingUtilities.invokeLater(() ->
-                inProfitTrackSession = true
+                {
+                    inProfitTrackSession = true;
+                    lastWidth = 0;
+                }
         );
     }
 
