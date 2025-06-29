@@ -8,9 +8,10 @@ import net.runelite.client.config.ConfigSection;
 /**
  * The ProfitTrackerConfig class is used to provide user preferences to the ProfitTrackerPlugin.
  */
-@ConfigGroup("ptconfig")
+@ConfigGroup(ProfitTrackerConfig.GROUP)
 public interface ProfitTrackerConfig extends Config
 {
+    String GROUP = "ptconfig";
 
     @ConfigSection(
             name = "Visual",
@@ -57,6 +58,17 @@ public interface ProfitTrackerConfig extends Config
             section = behaviorSettings
     )
     default boolean autoStart()
+    {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "rememberProfit",
+            name = "Remember profit",
+            description = "Profit will be remembered between application closes.",
+            section = behaviorSettings
+    )
+    default boolean rememberProfit()
     {
         return true;
     }
