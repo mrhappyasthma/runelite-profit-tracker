@@ -24,6 +24,11 @@ public class ProfitTrackerRecord {
     public ProfitTrackerPossessions startingPossessions;
     public ProfitTrackerPossessions currentPossessions;
     public Item[] lastPossessionChange;
+    /**
+     * A sum of all item changes observed. Similar to difference between starting and current possessions.
+     * However, various untracked storage will cause that to be less accurate.
+     */
+    public Item[] itemDifferenceAccumulated;
 
     public static final File RECORD_DIRECTORY = new File(RuneLite.RUNELITE_DIR, "profit-tracker");
 
@@ -43,6 +48,7 @@ public class ProfitTrackerRecord {
         ticksOnline = 0;
         profitAccumulated = 0;
         startingPossessions = new ProfitTrackerPossessions();
+        itemDifferenceAccumulated = new Item[0];
     }
 
     public void updateInventoryItems(Item[] items){
@@ -115,7 +121,7 @@ public class ProfitTrackerRecord {
     /**
      * Saves the current account data into a json file by the name of the account hash + rs profile type
      */
-    public void save(ConfigManager configManager, Gson gson){
+    public void save(Gson gson){
         String json = gson.toJson(this);
 
         File accountFile = getAccountRecordFile();

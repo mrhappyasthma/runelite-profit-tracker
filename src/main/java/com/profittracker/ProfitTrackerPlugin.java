@@ -22,7 +22,6 @@ import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.api.events.VarbitChanged;
-import org.apache.commons.lang3.ArrayUtils;
 
 import java.util.Arrays;
 import java.util.concurrent.ScheduledExecutorService;
@@ -177,7 +176,7 @@ public class ProfitTrackerPlugin extends Plugin
         inventoryValueChanged = true;
         if (accountRecord != null) {
             accountRecord.reset(configManager);
-            accountRecord.save(configManager, gson);
+            accountRecord.save(gson);
         }
     }
 
@@ -195,7 +194,7 @@ public class ProfitTrackerPlugin extends Plugin
 
         if (previousAccount != null && changedAccounts) {
             // Changed account, save the items we know about
-            accountRecord.save(configManager, gson);
+            accountRecord.save(gson);
             accountRecord = null;
         }
 
@@ -385,37 +384,25 @@ public class ProfitTrackerPlugin extends Plugin
         if skipTickForProfitCalculation is set, meaning this tick was bank / deposit
         so return 0
          */
-        Item[] newInventoryItems;
-        Item[] newBankItems;
-        Item[] newGrandExchangeItems = null;
+        ProfitTrackerPossessions newPossessions = new ProfitTrackerPossessions();
+        newPossessions.grandExchangeItems = null;
         long newProfit;
         Item[] possessionDifference = null;
-        Item[] bankDifference;
-        Item[] grandExchangeDifference;
 
         // calculate current inventory value
-        newInventoryItems = inventoryValueObject.getInventoryAndEquipmentContents();
-        newBankItems = inventoryValueObject.getBankContents();
+        newPossessions.inventoryItems = inventoryValueObject.getInventoryAndEquipmentContents();
+        newPossessions.bankItems = inventoryValueObject.getBankContents();
         if (grandExchangeValueChanged) {
-            newGrandExchangeItems = inventoryValueObject.getGrandExchangeContents();
+            newPossessions.grandExchangeItems = inventoryValueObject.getGrandExchangeContents();
         }
+        newPossessions.fillNullItems(accountRecord.currentPossessions);
+        Item[] newItems = newPossessions.getItems();
 
-        if (!skipTickForProfitCalculation && accountRecord.currentPossessions.inventoryItems != null && newInventoryItems != null)
+        if (!skipTickForProfitCalculation && accountRecord.currentPossessions.inventoryItems != null && newItems != null)
         {
             // calculate new profit
-            possessionDifference = inventoryValueObject.getItemCollectionDifference(accountRecord.currentPossessions.inventoryItems,newInventoryItems);
+            possessionDifference = inventoryValueObject.getItemCollectionDifference(accountRecord.currentPossessions.getItems(), newItems, config.estimateUntradeables());
             newProfit = inventoryValueObject.calculateItemValue(possessionDifference);
-            if (accountRecord.currentPossessions.bankItems != null && newBankItems != null) {
-                bankDifference = inventoryValueObject.getItemCollectionDifference(accountRecord.currentPossessions.bankItems,newBankItems);
-                // Profit is recalculated on all items instead of summed just in case item values could change between calculations
-                possessionDifference = ArrayUtils.addAll(possessionDifference,bankDifference);
-                newProfit = inventoryValueObject.calculateItemValue(possessionDifference);
-            }
-            if (accountRecord.currentPossessions.grandExchangeItems != null && newGrandExchangeItems != null) {
-                grandExchangeDifference = inventoryValueObject.getItemCollectionDifference(accountRecord.currentPossessions.grandExchangeItems,newGrandExchangeItems);
-                possessionDifference = ArrayUtils.addAll(possessionDifference,grandExchangeDifference);
-                newProfit = inventoryValueObject.calculateItemValue(possessionDifference);
-            }
 
             log.debug("Calculated " + newProfit + " profit for " + (possessionDifference.length) + " item changes.");
         }
@@ -432,21 +419,23 @@ public class ProfitTrackerPlugin extends Plugin
 
         // update prevInventoryValue for future calculations anyway!
         //prevInventoryValue = newInventoryValue;
-        accountRecord.updateInventoryItems(newInventoryItems);
-        if (newBankItems != null) {
+        accountRecord.updateInventoryItems(newPossessions.inventoryItems);
+        if (newPossessions.bankItems != null) {
             if (accountRecord.currentPossessions.bankItems == null) {
                 // If user hasn't opened bank yet, the deficit doesn't help us resync
                 depositDeficit = 0;
             }
-            accountRecord.updateBankItems(newBankItems);
+            accountRecord.updateBankItems(newPossessions.bankItems);
             overlay.setBankStatus(accountRecord.currentPossessions.bankItems != null);
         }
-        if (newGrandExchangeItems != null) {
-            accountRecord.updateGrandExchangeItems(newGrandExchangeItems);
+        if (newPossessions.grandExchangeItems != null) {
+            accountRecord.updateGrandExchangeItems(newPossessions.grandExchangeItems);
         }
 
         if (newProfit != 0) {
-            accountRecord.lastPossessionChange = possessionDifference;
+            Item[] rawPossessionDifference = ProfitTrackerInventoryValue.getItemCollectionDifference(accountRecord.currentPossessions.getItems(), newItems);
+            accountRecord.lastPossessionChange = rawPossessionDifference;
+            accountRecord.itemDifferenceAccumulated = ProfitTrackerInventoryValue.getItemCollectionSum(accountRecord.itemDifferenceAccumulated, rawPossessionDifference);
         }
 
         return newProfit;
@@ -695,6 +684,6 @@ public class ProfitTrackerPlugin extends Plugin
     @Subscribe
     public void onClientShutdown(ClientShutdown event)
     {
-        accountRecord.save(configManager, gson);
+        accountRecord.save(gson);
     }
 }
