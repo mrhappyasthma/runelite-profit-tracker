@@ -61,6 +61,7 @@ public class ProfitTrackerInventoryValue {
     @Inject
     private ProfitTrackerConfig config;
     private GrandExchangeOfferData[] offers = new GrandExchangeOfferData[8];
+    private Item[] collectionBoxItems = new Item[0];
 
     /**
      * Data storage for GE offers as the normal object always maintains a reference,
@@ -93,11 +94,13 @@ public class ProfitTrackerInventoryValue {
     public void setOffers(GrandExchangeOffer[] offers){
         if (offers == null){
             this.offers = new GrandExchangeOfferData[8];
+            this.collectionBoxItems = new Item[0];
             return;
         }
         for (int index = 0; index < offers.length; index++){
             this.offers[index] = new GrandExchangeOfferData(offers[index]);
         }
+        this.collectionBoxItems = getCollectionBoxContents();
     }
 
     private long calculateItemValue(Item item) {
@@ -222,15 +225,17 @@ public class ProfitTrackerInventoryValue {
     public Item[] getInventoryAndEquipmentContents(){
         ItemContainer inventoryContainer = client.getItemContainer(InventoryID.INV);
         ItemContainer equipmentContainer = client.getItemContainer(InventoryID.WORN);
+        Item[] inventoryItems = new Item[0];
+        Item[] equipmentItems = new Item[0];
 
-        if (inventoryContainer == null || equipmentContainer == null)
-        {
-            return null;
+        if (inventoryContainer != null){
+            inventoryItems = inventoryContainer.getItems();
+        }
+        if (equipmentContainer != null){
+            equipmentItems = equipmentContainer.getItems();
         }
 
-        Item[] inventoryItems = inventoryContainer.getItems();
-        Item[] equipmentItems = equipmentContainer.getItems();
-        Item[] personItems = ArrayUtils.addAll(inventoryItems,equipmentItems);
+        Item[] personItems = ArrayUtils.addAll(inventoryItems, equipmentItems);
         // Expand to have runes from pouch as individual items
         return expandContainers(personItems);
     }
@@ -274,7 +279,7 @@ public class ProfitTrackerInventoryValue {
                     break;
             }
         }
-        return ArrayUtils.addAll(items.toArray(new Item[0]), getCollectionBoxContents());
+        return ArrayUtils.addAll(items.toArray(new Item[0]), collectionBoxItems);
     }
 
     /**
@@ -309,7 +314,7 @@ public class ProfitTrackerInventoryValue {
     /**
      * Replaces various untradeable items with items they can be converted into, or coin values of those items
      */
-    private Item[] replaceUntradeables(Item[] items){
+    public Item[] replaceUntradeables(Item[] items){
         Item[] extraItems = new Item[0];
         Item[] resultItems = items.clone();
         for (int i = 0; i < resultItems.length; i++){
@@ -414,19 +419,13 @@ public class ProfitTrackerInventoryValue {
      * Converts the given item array into a map
      * @return Map of item ID -> QTY
      */
-    private Map<Integer, Integer> mapItemArray(Item[] items){
+    private static Map<Integer, Integer> mapItemArray(Item[] items){
         return Arrays.stream(items)
-                .filter((item) -> item.getQuantity() > 0)
                 .collect(Collectors.toMap(Item::getId, Item::getQuantity, Integer::sum));
     }
 
-    /**
-     * Compares the two arrays, returning an array of item differences
-     * For example, dropping a shark would be an array of 1 shark item, with quantity -1
-     * @return Array of items with quantity set to the difference
-     */
-    public Item[] getItemCollectionDifference(Item[] originalItems, Item[] newItems){
-        if (config.estimateUntradeables()){
+    public Item[] getItemCollectionDifference(Item[] originalItems, Item[] newItems, boolean replaceUntradeables){
+        if (replaceUntradeables){
             //Replace untradeables with their equivalent items.
             //The replaceUntradeables function is inaccurate for very small amounts, so we need to perform it over the source
             //with larger quantities instead of over the result difference between collections which generally is just 1 item.
@@ -434,19 +433,65 @@ public class ProfitTrackerInventoryValue {
             originalItems = replaceUntradeables(originalItems);
             newItems = replaceUntradeables(newItems);
         }
+        return getItemCollectionDifference(originalItems, newItems);
+    }
+
+    /**
+     * Compares the two arrays, returning an array of item differences
+     * For example, dropping a shark would be an array of 1 shark item, with quantity -1
+     * @return Array of items with quantity set to the difference
+     */
+    public static Item[] getItemCollectionDifference(Item[] originalItems, Item[] newItems){
         Map<Integer, Integer> originalItemList = mapItemArray(originalItems);
         Map<Integer, Integer> newItemList = mapItemArray(newItems);
         //Subtract old quantities from new to get difference
         originalItemList.forEach((id, quantity) -> newItemList.merge(id, -quantity,(a,b)-> {
             int sum = a + b;
-            //Returning null for merge removes the entry
+            //Returning null if merge removes the entry
             return sum != 0 ? sum : null;
         }));
 
         //Convert back to item array
         List<Item> itemDifference = new ArrayList<>();
-        newItemList.forEach((id, quantity) -> itemDifference.add(new Item(id,quantity)));
+        newItemList.forEach((id, quantity) -> itemDifference.add(new Item(id, quantity)));
 
         return itemDifference.toArray(new Item[0]);
+    }
+
+    /**
+     * Returns an item array which is the sum of two other item arrays, adjusting quantities as needed
+     * Null collections are not added
+     * If both collections are null, returns null
+     */
+    public static Item[] getItemCollectionSum(Item[] items1, Item[] items2){
+        if (items1 == null || items2 == null){
+            if (items1 != null) {
+                return items1;
+            }
+            return items2;
+        }
+        Map<Integer, Integer> firstItems = mapItemArray(items1);
+        Map<Integer, Integer> secondItems = mapItemArray(items2);
+        firstItems.forEach((id, quantity) -> secondItems.merge(id, quantity,(a,b)-> {
+            int sum = a + b;
+            //Returning null if merge removes the entry
+            return sum != 0 ? sum : null;
+        }));
+
+        //Convert back to item array
+        List<Item> itemSum = new ArrayList<>();
+        secondItems.forEach((id, quantity) -> itemSum.add(new Item(id, quantity)));
+
+        return itemSum.toArray(new Item[0]);
+    }
+
+    public static Item[] getItemCollectionGain(Item[] itemDifferences){
+        List<Item> itemGain = new ArrayList<>();
+        mapItemArray(itemDifferences).forEach((id, quantity) -> {
+            if (quantity > 0){
+                itemGain.add(new Item(id, quantity));
+            }
+        });
+        return itemGain.toArray(new Item[0]);
     }
 }

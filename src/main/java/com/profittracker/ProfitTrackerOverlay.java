@@ -14,6 +14,9 @@ import javax.swing.*;
 import java.awt.*;
 
 import java.text.DecimalFormat;
+import java.util.Arrays;
+import java.util.Collections;
+
 /**
  * The ProfitTrackerOverlay class is used to display profit values for the user
  */
@@ -24,6 +27,9 @@ public class ProfitTrackerOverlay extends Overlay {
     private long lastTickMillies;
     private boolean inProfitTrackSession;
     private boolean hasBankData;
+    private String lastTimeDisplay;
+    private long lastProfitValue;
+    private int lastWidth;
 
     private final ProfitTrackerConfig ptConfig;
     private final ProfitTrackerPlugin ptPlugin;
@@ -69,13 +75,14 @@ public class ProfitTrackerOverlay extends Overlay {
         String titleText = "Profit Tracker:";
         long millisecondsElapsed;
         long profitRateValue;
+        String timeText;
 
         if (startTimeMillies > 0)
         {
             if (ptConfig.onlineOnlyRate()){
                 millisecondsElapsed = (long)(Math.max(0, activeTicks - 1)  * MILLISECONDS_PER_TICK);
                 //Add duration since last tick to ensure timer pacing isn't uneven
-                if (lastTickMillies != 0){
+                if (lastTickMillies != 0 && inProfitTrackSession){
                     millisecondsElapsed += System.currentTimeMillis() - lastTickMillies;
                 }
             } else {
@@ -88,7 +95,16 @@ public class ProfitTrackerOverlay extends Overlay {
             millisecondsElapsed = 0;
         }
 
-        profitRateValue = calculateProfitHourly(millisecondsElapsed, profitValue);
+        timeText = formatTimeIntervalFromMs(millisecondsElapsed, false);
+        // Rate limit profit update to avoid extremely high profit being difficult to read
+        // Also reduces visual noise
+        if (! timeText.equals(lastTimeDisplay) || lastProfitValue == 0) {
+            profitRateValue = calculateProfitHourly(millisecondsElapsed, profitValue);
+            lastProfitValue = profitRateValue;
+        } else {
+            profitRateValue = lastProfitValue;
+        }
+        lastTimeDisplay = timeText;
 
         // Not sure how this can occur, but it was recommended to do so
         panelComponent.getChildren().clear();
@@ -121,27 +137,35 @@ public class ProfitTrackerOverlay extends Overlay {
             tooltipManager.add(new Tooltip(tooltipString));
         }
 
+        String formattedProfit = String.format("%,d",profitValue);
+        String formattedRate = String.format("%,d",profitRateValue) + "K/H";
+        int titleWidth = graphics.getFontMetrics().stringWidth(titleText) + 40;
+        int profitWidth = graphics.getFontMetrics().stringWidth("Profit:    " + formattedProfit);
+        int rateWidth = graphics.getFontMetrics().stringWidth("Rate:    " + formattedRate);
+        // Only allow width to grow, to avoid jitters at high values
+        lastWidth = Collections.max(Arrays.asList(lastWidth, titleWidth, profitWidth, rateWidth));
+
         // Set the size of the overlay (width)
         panelComponent.setPreferredSize(new Dimension(
-                graphics.getFontMetrics().stringWidth(titleText) + 40,
+                lastWidth,
                 0));
 
         // elapsed time
         panelComponent.getChildren().add(LineComponent.builder()
                 .left("Time:")
-                .right(formatTimeIntervalFromMs(millisecondsElapsed, false))
+                .right(timeText)
                 .build());
 
         // Profit
         panelComponent.getChildren().add(LineComponent.builder()
                 .left("Profit:")
-                .right(FormatIntegerWithCommas(profitValue))
+                .right(formattedProfit)
                 .build());
 
         // Profit Rate
         panelComponent.getChildren().add(LineComponent.builder()
                 .left("Rate:")
-                .right(profitRateValue + "K/H")
+                .right(formattedRate)
                 .build());
 
         return panelComponent.render(graphics);
@@ -153,7 +177,11 @@ public class ProfitTrackerOverlay extends Overlay {
      */
     public void updateProfitValue(final long newValue) {
         SwingUtilities.invokeLater(() ->
-            profitValue = newValue
+                {
+                    profitValue = newValue;
+                    // Value reset to ensure rate is shown immediately, instead of waiting for next time increment
+                    lastProfitValue = 0;
+                }
         );
     }
 
@@ -163,7 +191,10 @@ public class ProfitTrackerOverlay extends Overlay {
      */
     public void updateStartTimeMillies(final long newValue) {
         SwingUtilities.invokeLater(() ->
-                startTimeMillies = newValue
+                {
+                    startTimeMillies = newValue;
+                    lastTickMillies = System.currentTimeMillis();
+                }
         );
     }
 
@@ -179,7 +210,10 @@ public class ProfitTrackerOverlay extends Overlay {
     public void startSession()
     {
         SwingUtilities.invokeLater(() ->
-                inProfitTrackSession = true
+                {
+                    inProfitTrackSession = true;
+                    lastWidth = 0;
+                }
         );
     }
 
