@@ -16,6 +16,7 @@ import net.runelite.api.widgets.Widget;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ClientShutdown;
+import net.runelite.client.events.PluginChanged;
 import net.runelite.client.events.RuneScapeProfileChanged;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.Plugin;
@@ -54,12 +55,10 @@ public class ProfitTrackerPlugin extends Plugin
     private boolean grandExchangeValueChanged;
     private boolean inProfitTrackSession;
     private boolean runePouchContentsChanged;
-    // Remembers if the bank was open last tick, because tick perfect bank close reports changes late
-    private boolean bankJustClosed;
-    // Remembers if untracked storage was open last tick, as tick perfect close reports changes late
-    private boolean storageJustClosed;
     // State boolean for when a widget we do not fully track is currently opened, such as the leprechaun tool store
     private boolean untrackedStorageOpened;
+    // Remembers the state of bank interface
+    private boolean bankOpened;
     // Remembers the state of grand exchange
     private boolean grandExchangeOpened;
     // Set when using a deposit menu option. Used to create a depositing deficit for the next time you open bank
@@ -68,7 +67,11 @@ public class ProfitTrackerPlugin extends Plugin
     private boolean depositingItem;
     // State of a deposit box being open, used to avoid tracking profit changes when just sending to the bank
     private boolean depositBoxOpened;
-    private long depositDeficit;
+    // Tracks the last widget we care about that closed, like bank, GE, other storage
+    private int closingWidgetId;
+    // Tracks when an event causes an item to be stored to an untracked location, like using an item on a tackle box
+    private boolean depositingUntrackedItem;
+
     private final int[] RUNE_POUCH_VARBITS = {
             VarbitID.RUNE_POUCH_QUANTITY_1,
             VarbitID.RUNE_POUCH_QUANTITY_2,
@@ -140,8 +143,6 @@ public class ProfitTrackerPlugin extends Plugin
         inProfitTrackSession = false;
 
         runePouchContentsChanged = false;
-
-        bankJustClosed = false;
 
         depositingItem = false;
     }
@@ -217,7 +218,6 @@ public class ProfitTrackerPlugin extends Plugin
         totalProfit = accountRecord.profitAccumulated;
         activeTicks = accountRecord.ticksOnline;
         startTickMillis = accountRecord.startTickMillies;
-        depositDeficit = accountRecord.depositDeficit;
 
         overlay.updateProfitValue(totalProfit);
         overlay.updateStartTimeMillies(startTickMillis);
@@ -263,6 +263,10 @@ public class ProfitTrackerPlugin extends Plugin
                 overlay.startSession();
                 inProfitTrackSession = true;
                 inventoryValueChanged = true;
+                // Active ticks will only be 0 if toggling the plugin
+                if (activeTicks == 0) {
+                    resetSession();
+                }
             } else {
                 return;
             }
@@ -278,47 +282,36 @@ public class ProfitTrackerPlugin extends Plugin
 
         if (inventoryValueChanged || runePouchContentsChanged || bankValueChanged || grandExchangeValueChanged)
         {
-            // Interacting with bank
-            // itemContainerChanged does not report bank change if closed on same tick
-            if (storageJustClosed || untrackedStorageOpened) {
-                skipTickForProfitCalculation = true;
-            }
+            tickProfit = calculateProfit();
 
-            tickProfit = calculateTickProfit();
-
-            // accumulate profit
-            if (depositingItem || depositBoxOpened || bankJustClosed){
-                // Track a deficit for deposits because of deposit box problems
-                // Include bank last tick close just to prevent confusing xp drops, even though they re-sync on open
-                depositDeficit += tickProfit;
-                depositingItem = false;
-                tickProfit = 0;
-            }
-
-            // Resync with untracked changes from using deposit box
-            if (bankValueChanged) {
-                tickProfit += depositDeficit;
-                depositDeficit = 0;
-            }
-            accountRecord.depositDeficit = depositDeficit;
-
-            totalProfit += tickProfit;
-            accountRecord.profitAccumulated = totalProfit;
-            overlay.updateProfitValue(totalProfit);
-
-            // generate gold drop
+            // Generate gold drop only based on instantaneous profit, to avoid scaring users during GE adjustment ticks
             if (config.goldDrops() && tickProfit != 0)
             {
                 goldDropsObject.requestGoldDrop(tickProfit);
             }
 
+            totalProfit += tickProfit;
+
+            if (tickProfit != 0) {
+                // This causes total profit to only update when we profit off something.
+                // While this may cause temporary inaccuracy when GE prices change, it prevents excessive calculations
+                // every time an item is moved, equipped, deposited, etc.
+                totalProfit = inventoryValueObject.calculateItemValue(accountRecord.itemDifferenceAccumulated);
+            }
+
+            accountRecord.profitAccumulated = totalProfit;
+            overlay.updateProfitValue(totalProfit);
+
             inventoryValueChanged = false;
             bankValueChanged = false;
             runePouchContentsChanged = false;
             grandExchangeValueChanged = false;
+            depositingItem = false;
         }
-        bankJustClosed = false;
-        storageJustClosed = false;
+        if (closingWidgetId != 0) {
+            setWidgetClosedVariables(closingWidgetId);
+            closingWidgetId = 0;
+        }
     }
 
     @Subscribe
@@ -341,6 +334,9 @@ public class ProfitTrackerPlugin extends Plugin
             case InterfaceID.BANK_DEPOSITBOX:
                 depositBoxOpened = true;
                 break;
+            case InterfaceID.HUNTSMANS_KIT:
+            case InterfaceID.SEED_VAULT:
+            case InterfaceID.TACKLE_BOX_MAIN:
             case InterfaceID.FARMING_TOOLS:
                 untrackedStorageOpened = true;
                 break;
@@ -350,15 +346,37 @@ public class ProfitTrackerPlugin extends Plugin
     @Subscribe
     public void onWidgetClosed(WidgetClosed event)
     {
+        // Widget closes immediately, but items can still transfer between containers the next tick
+        // So actually flagging them is done at the end of the next tick, we just set a variable here to look for later
         switch (event.getGroupId()) {
             case InterfaceID.BANKMAIN:
-                bankJustClosed = true;
-                break;
-            //Catch untracked storage closing, as tick perfect close can cause onItemContainerChanged to not see the change
             case InterfaceID.HUNTSMANS_KIT:
             case InterfaceID.SEED_VAULT:
             case InterfaceID.TACKLE_BOX_MAIN:
-                storageJustClosed = true;
+            case InterfaceID.FARMING_TOOLS:
+            case InterfaceID.GE_COLLECT:
+            case InterfaceID.GE_OFFERS:
+            case InterfaceID.BANK_DEPOSIT_IMP:
+            case InterfaceID.BANK_DEPOSITBOX:
+                closingWidgetId = event.getGroupId();
+                break;
+        }
+    }
+
+    /**
+     * Clears the associated variable for the tracked storage for the given widget groupID
+     * Should be called with closingWidgetId
+     */
+    private void setWidgetClosedVariables(int groupId){
+        switch (groupId) {
+            case InterfaceID.BANKMAIN:
+                bankOpened = false;
+                break;
+            case InterfaceID.HUNTSMANS_KIT:
+            case InterfaceID.SEED_VAULT:
+            case InterfaceID.TACKLE_BOX_MAIN:
+            case InterfaceID.FARMING_TOOLS:
+                untrackedStorageOpened = false;
                 break;
             case InterfaceID.GE_COLLECT:
             case InterfaceID.GE_OFFERS:
@@ -367,17 +385,11 @@ public class ProfitTrackerPlugin extends Plugin
             case InterfaceID.BANK_DEPOSIT_IMP:
             case InterfaceID.BANK_DEPOSITBOX:
                 depositBoxOpened = false;
-                // Negates problems with closing box and depositing same tick
-                depositingItem = true;
-                break;
-            case InterfaceID.FARMING_TOOLS:
-                untrackedStorageOpened = false;
-                storageJustClosed = true;
                 break;
         }
     }
 
-    private long calculateTickProfit()
+    private long calculateProfit()
     {
         /*
         Calculate and return the profit for this tick
@@ -386,7 +398,7 @@ public class ProfitTrackerPlugin extends Plugin
          */
         ProfitTrackerPossessions newPossessions = new ProfitTrackerPossessions();
         newPossessions.grandExchangeItems = null;
-        long newProfit;
+        long newProfit = 0;
         Item[] possessionDifference = null;
 
         // calculate current inventory value
@@ -395,6 +407,7 @@ public class ProfitTrackerPlugin extends Plugin
         if (grandExchangeValueChanged) {
             newPossessions.grandExchangeItems = inventoryValueObject.getGrandExchangeContents();
         }
+        accountRecord.currentPossessions.fillNullItems(newPossessions);
         newPossessions.fillNullItems(accountRecord.currentPossessions);
         Item[] newItems = newPossessions.getItems();
 
@@ -412,31 +425,64 @@ public class ProfitTrackerPlugin extends Plugin
             log.debug("Skipping profit calculation!");
 
             skipTickForProfitCalculation = false;
+        }
 
-            // no profit this tick
-            newProfit = 0;
+        Item[] rawPossessionDifference = new Item[0];
+        if (accountRecord.currentPossessions.getItems() != null) {
+            rawPossessionDifference = ProfitTrackerInventoryValue.getItemCollectionDifference(accountRecord.currentPossessions.getItems(), newItems);
+        }
+        if (rawPossessionDifference.length > 0) {
+            // This block generally checks for possessions changing when they shouldn't be, often when closing storage the same tick as withdraw/depositing
+            // Otherwise, just records the last change seen
+            boolean bankingItemsWithoutWidget = (bankOpened || depositingItem || depositBoxOpened) && inventoryValueObject.getBankContents() == null && !untrackedStorageOpened;
+            // If bank/deposit box/depositing flag, any lost items are in bank, any gained items came from bank
+            if (bankingItemsWithoutWidget) {
+                Item[] bankChange = ProfitTrackerInventoryValue.getItemCollectionDifference(rawPossessionDifference, new Item[0]);
+                newPossessions.bankItems = ProfitTrackerInventoryValue.getItemCollectionSum(accountRecord.currentPossessions.bankItems, bankChange);
+                depositingItem = false;
+            }
+            // If ge opened, gained items pull from ge, items banked will cause temporary desync
+            if (grandExchangeOpened && !grandExchangeValueChanged) {
+                Item[] grandExchangeChange = ProfitTrackerInventoryValue.getItemCollectionDifference(rawPossessionDifference, new Item[0]);
+                newPossessions.grandExchangeItems = ProfitTrackerInventoryValue.getItemCollectionSum(accountRecord.currentPossessions.grandExchangeItems, grandExchangeChange);
+            }
+            // If untracked storage, move lost items to untracked storage, add gained items to old record
+            if (untrackedStorageOpened || depositingUntrackedItem) {
+                depositingUntrackedItem = false;
+                Item[] untrackedStorageChange = ProfitTrackerInventoryValue.getItemCollectionDifference(rawPossessionDifference, new Item[0]);
+                Item[] itemLoss = ProfitTrackerInventoryValue.getItemCollectionGain(untrackedStorageChange);
+                Item[] itemGain = ProfitTrackerInventoryValue.getItemCollectionGain(rawPossessionDifference);
+                newPossessions.untrackedStorageItems = ProfitTrackerInventoryValue.getItemCollectionSum(newPossessions.untrackedStorageItems, untrackedStorageChange);
+                // If we go into the negatives, that means untrackedStorage originally had more items in it
+                Item[] missingItems = ProfitTrackerInventoryValue.getItemCollectionGain(ProfitTrackerInventoryValue.getItemCollectionDifference(newPossessions.untrackedStorageItems, new Item[0]));
+                // Ensure starting possessions has at least as many as were withdrawn
+                accountRecord.startingPossessions.untrackedStorageItems = ProfitTrackerInventoryValue.getItemCollectionSum(accountRecord.startingPossessions.untrackedStorageItems, missingItems);
+                accountRecord.currentPossessions.untrackedStorageItems = ProfitTrackerInventoryValue.getItemCollectionSum(accountRecord.currentPossessions.untrackedStorageItems, missingItems);
+                newPossessions.untrackedStorageItems = ProfitTrackerInventoryValue.getItemCollectionSum(newPossessions.untrackedStorageItems, missingItems);
+            }
+
+            newItems = newPossessions.getItems();
+            // This should always be empty in the event of a storage being opened
+            rawPossessionDifference = ProfitTrackerInventoryValue.getItemCollectionDifference(accountRecord.currentPossessions.getItems(), newItems);
+            if (rawPossessionDifference.length > 0) {
+                accountRecord.lastPossessionChange = rawPossessionDifference;
+                accountRecord.itemDifferenceAccumulated = ProfitTrackerInventoryValue.getItemCollectionSum(accountRecord.itemDifferenceAccumulated, rawPossessionDifference);
+            } else {
+                newProfit = 0;
+            }
         }
 
         // update prevInventoryValue for future calculations anyway!
         //prevInventoryValue = newInventoryValue;
         accountRecord.updateInventoryItems(newPossessions.inventoryItems);
         if (newPossessions.bankItems != null) {
-            if (accountRecord.currentPossessions.bankItems == null) {
-                // If user hasn't opened bank yet, the deficit doesn't help us resync
-                depositDeficit = 0;
-            }
             accountRecord.updateBankItems(newPossessions.bankItems);
             overlay.setBankStatus(accountRecord.currentPossessions.bankItems != null);
         }
         if (newPossessions.grandExchangeItems != null) {
             accountRecord.updateGrandExchangeItems(newPossessions.grandExchangeItems);
         }
-
-        if (newProfit != 0) {
-            Item[] rawPossessionDifference = ProfitTrackerInventoryValue.getItemCollectionDifference(accountRecord.currentPossessions.getItems(), newItems);
-            accountRecord.lastPossessionChange = rawPossessionDifference;
-            accountRecord.itemDifferenceAccumulated = ProfitTrackerInventoryValue.getItemCollectionSum(accountRecord.itemDifferenceAccumulated, rawPossessionDifference);
-        }
+        accountRecord.updateUntrackedItems(newPossessions.untrackedStorageItems);
 
         return newProfit;
     }
@@ -462,16 +508,8 @@ public class ProfitTrackerPlugin extends Plugin
             bankValueChanged = true;
         }
 
-        // In these events, inventory WILL be changed, but we DON'T want to calculate profit!
-        switch (containerId){
-            case InventoryID.HUNTSMANS_KIT:
-            case InventoryID.SEED_VAULT:
-            case InventoryID.TACKLE_BOX:
-                skipTickForProfitCalculation = true;
-        }
-
         // No container event occurs for the GE collection item containers, but inventory does
-        if (grandExchangeOpened) {
+        if (grandExchangeOpened && closingWidgetId != InterfaceID.GE_OFFERS && closingWidgetId != InterfaceID.GE_COLLECT) {
             inventoryValueObject.setOffers(client.getGrandExchangeOffers());
             grandExchangeValueChanged = true;
         }
@@ -480,7 +518,7 @@ public class ProfitTrackerPlugin extends Plugin
     @Subscribe
     public void onGrandExchangeOfferChanged(GrandExchangeOfferChanged event)
     {
-        if (grandExchangeOpened){
+        if (grandExchangeOpened && closingWidgetId != InterfaceID.GE_OFFERS && closingWidgetId != InterfaceID.GE_COLLECT){
             inventoryValueObject.setOffers(client.getGrandExchangeOffers());
             grandExchangeValueChanged = true;
         }
@@ -545,7 +583,7 @@ public class ProfitTrackerPlugin extends Plugin
                     case "use":
                         log.debug("Ignoring storage item interaction.");
                         // Ignore manual changes to container items as the items have not been lost
-                        skipTickForProfitCalculation = true;
+                        depositingUntrackedItem = true;
                 }
         }
 
@@ -570,7 +608,6 @@ public class ProfitTrackerPlugin extends Plugin
                     case "empty":
                     case "fill":
                     case "use":
-                        // Ignore manual changes to container items as the items have not been lost
                         skipTickForProfitCalculation = false;
                 }
         }

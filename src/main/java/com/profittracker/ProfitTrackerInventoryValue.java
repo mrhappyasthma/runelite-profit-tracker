@@ -61,6 +61,7 @@ public class ProfitTrackerInventoryValue {
     @Inject
     private ProfitTrackerConfig config;
     private GrandExchangeOfferData[] offers = new GrandExchangeOfferData[8];
+    private Item[] collectionBoxItems = new Item[0];
 
     /**
      * Data storage for GE offers as the normal object always maintains a reference,
@@ -93,11 +94,13 @@ public class ProfitTrackerInventoryValue {
     public void setOffers(GrandExchangeOffer[] offers){
         if (offers == null){
             this.offers = new GrandExchangeOfferData[8];
+            this.collectionBoxItems = new Item[0];
             return;
         }
         for (int index = 0; index < offers.length; index++){
             this.offers[index] = new GrandExchangeOfferData(offers[index]);
         }
+        this.collectionBoxItems = getCollectionBoxContents();
     }
 
     private long calculateItemValue(Item item) {
@@ -276,7 +279,7 @@ public class ProfitTrackerInventoryValue {
                     break;
             }
         }
-        return ArrayUtils.addAll(items.toArray(new Item[0]), getCollectionBoxContents());
+        return ArrayUtils.addAll(items.toArray(new Item[0]), collectionBoxItems);
     }
 
     /**
@@ -311,7 +314,7 @@ public class ProfitTrackerInventoryValue {
     /**
      * Replaces various untradeable items with items they can be converted into, or coin values of those items
      */
-    private Item[] replaceUntradeables(Item[] items){
+    public Item[] replaceUntradeables(Item[] items){
         Item[] extraItems = new Item[0];
         Item[] resultItems = items.clone();
         for (int i = 0; i < resultItems.length; i++){
@@ -418,7 +421,6 @@ public class ProfitTrackerInventoryValue {
      */
     private static Map<Integer, Integer> mapItemArray(Item[] items){
         return Arrays.stream(items)
-                .filter((item) -> item.getQuantity() > 0)
                 .collect(Collectors.toMap(Item::getId, Item::getQuantity, Integer::sum));
     }
 
@@ -451,7 +453,7 @@ public class ProfitTrackerInventoryValue {
 
         //Convert back to item array
         List<Item> itemDifference = new ArrayList<>();
-        newItemList.forEach((id, quantity) -> itemDifference.add(new Item(id,quantity)));
+        newItemList.forEach((id, quantity) -> itemDifference.add(new Item(id, quantity)));
 
         return itemDifference.toArray(new Item[0]);
     }
@@ -478,8 +480,18 @@ public class ProfitTrackerInventoryValue {
 
         //Convert back to item array
         List<Item> itemSum = new ArrayList<>();
-        secondItems.forEach((id, quantity) -> itemSum.add(new Item(id,quantity)));
+        secondItems.forEach((id, quantity) -> itemSum.add(new Item(id, quantity)));
 
         return itemSum.toArray(new Item[0]);
+    }
+
+    public static Item[] getItemCollectionGain(Item[] itemDifferences){
+        List<Item> itemGain = new ArrayList<>();
+        mapItemArray(itemDifferences).forEach((id, quantity) -> {
+            if (quantity > 0){
+                itemGain.add(new Item(id, quantity));
+            }
+        });
+        return itemGain.toArray(new Item[0]);
     }
 }
