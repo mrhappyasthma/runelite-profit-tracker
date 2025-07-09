@@ -10,9 +10,16 @@ public class ProfitTrackerPossessions {
     public Item[] inventoryItems;
     public Item[] bankItems;
     public Item[] grandExchangeItems;
+    /**
+     * Items stored in various storage that we don't actually have hooks to look into
+     * Items are stored here if one of those storages is opened, and an item is lost
+     * Items should also be stored in the original possessions if withdrawn and not previously known to be present
+     */
+    public Item[] untrackedStorageItems;
 
     public Item[] getItems(){
         Item[] storedItems = getItemCollectionSum(bankItems, grandExchangeItems);
+        storedItems = getItemCollectionSum(untrackedStorageItems, storedItems);
         return getItemCollectionSum(inventoryItems, storedItems);
     }
 
@@ -28,6 +35,9 @@ public class ProfitTrackerPossessions {
         }
         if (grandExchangeItems == null){
             grandExchangeItems = knownPossessions.grandExchangeItems;
+        }
+        if (untrackedStorageItems == null){
+            untrackedStorageItems = knownPossessions.untrackedStorageItems;
         }
     }
 }

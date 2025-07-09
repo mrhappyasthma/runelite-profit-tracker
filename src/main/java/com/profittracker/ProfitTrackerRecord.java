@@ -20,15 +20,13 @@ public class ProfitTrackerRecord {
     public long startTickMillies;
     public long ticksOnline;
     public long profitAccumulated;
-    public long depositDeficit;
     public ProfitTrackerPossessions startingPossessions;
     public ProfitTrackerPossessions currentPossessions;
     public Item[] lastPossessionChange;
     /**
-     * A sum of all item changes observed. Similar to difference between starting and current possessions.
-     * However, various untracked storage will cause that to be less accurate.
+     * A sum of all item changes observed. Ideally the same as the difference between starting and current possessions.
      */
-    public Item[] itemDifferenceAccumulated;
+    public Item[] itemDifferenceAccumulated = new Item[0];
 
     public static final File RECORD_DIRECTORY = new File(RuneLite.RUNELITE_DIR, "profit-tracker");
 
@@ -38,7 +36,6 @@ public class ProfitTrackerRecord {
         startTickMillies = System.currentTimeMillis();
         ticksOnline = 0;
         profitAccumulated = 0;
-        depositDeficit = 0;
         startingPossessions = new ProfitTrackerPossessions();
         currentPossessions = new ProfitTrackerPossessions();
     }
@@ -70,6 +67,13 @@ public class ProfitTrackerRecord {
             startingPossessions.grandExchangeItems = items;
         }
         currentPossessions.grandExchangeItems = items;
+    }
+
+    public void updateUntrackedItems(Item[] items){
+        if (startingPossessions.untrackedStorageItems == null) {
+            startingPossessions.untrackedStorageItems = items;
+        }
+        currentPossessions.untrackedStorageItems = items;
     }
 
     public String getAccountRecordKey(){
