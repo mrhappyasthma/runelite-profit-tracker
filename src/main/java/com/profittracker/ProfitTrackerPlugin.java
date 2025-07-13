@@ -12,11 +12,11 @@ import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.api.gameval.VarbitID;
-import net.runelite.api.widgets.Widget;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ClientShutdown;
-import net.runelite.client.events.PluginChanged;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.events.RuneScapeProfileChanged;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.Plugin;
@@ -25,7 +25,6 @@ import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.api.events.VarbitChanged;
 
 import java.util.Arrays;
-import java.util.concurrent.ScheduledExecutorService;
 
 @Slf4j
 @PluginDescriptor(
@@ -105,7 +104,7 @@ public class ProfitTrackerPlugin extends Plugin
     private Gson gson;
 
     @Inject
-    private ScheduledExecutorService executor;
+    private ClientThread clientThread;
 
     @Override
     protected void startUp() throws Exception
@@ -450,8 +449,6 @@ public class ProfitTrackerPlugin extends Plugin
             if (untrackedStorageOpened || depositingUntrackedItem) {
                 depositingUntrackedItem = false;
                 Item[] untrackedStorageChange = ProfitTrackerInventoryValue.getItemCollectionDifference(rawPossessionDifference, new Item[0]);
-                Item[] itemLoss = ProfitTrackerInventoryValue.getItemCollectionGain(untrackedStorageChange);
-                Item[] itemGain = ProfitTrackerInventoryValue.getItemCollectionGain(rawPossessionDifference);
                 newPossessions.untrackedStorageItems = ProfitTrackerInventoryValue.getItemCollectionSum(newPossessions.untrackedStorageItems, untrackedStorageChange);
                 // If we go into the negatives, that means untrackedStorage originally had more items in it
                 Item[] missingItems = ProfitTrackerInventoryValue.getItemCollectionGain(ProfitTrackerInventoryValue.getItemCollectionDifference(newPossessions.untrackedStorageItems, new Item[0]));
@@ -722,5 +719,22 @@ public class ProfitTrackerPlugin extends Plugin
     public void onClientShutdown(ClientShutdown event)
     {
         accountRecord.save(gson);
+    }
+
+    @Subscribe
+    public void onConfigChanged(ConfigChanged configChanged)
+    {
+        // Allows hot swapping between price calculation methods non-destructively
+        if (configChanged.getGroup().equals(ProfitTrackerConfig.GROUP)) {
+            clientThread.invoke(this::updateProfitUI);
+        }
+    }
+
+    private void updateProfitUI(){
+        if (accountRecord != null) {
+            totalProfit = inventoryValueObject.calculateItemValue(accountRecord.itemDifferenceAccumulated);
+            accountRecord.profitAccumulated = totalProfit;
+            overlay.updateProfitValue(totalProfit);
+        }
     }
 }
