@@ -12,6 +12,7 @@ import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.api.gameval.VarbitID;
+import net.runelite.api.widgets.Widget;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ClientShutdown;
@@ -708,6 +709,13 @@ public class ProfitTrackerPlugin extends Plugin
     public void onScriptPreFired(ScriptPreFired scriptPreFired)
     {
         goldDropsObject.onScriptPreFired(scriptPreFired);
+
+    }
+
+    @Subscribe
+    public void onScriptPostFired(ScriptPostFired event)
+    {
+        goldDropsObject.onScriptPostFired(event);
     }
 
     @Subscribe

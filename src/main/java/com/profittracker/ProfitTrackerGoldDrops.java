@@ -2,6 +2,7 @@ package com.profittracker;
 
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
+import net.runelite.api.events.ScriptPostFired;
 import net.runelite.api.events.ScriptPreFired;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.ItemID;
@@ -80,6 +81,10 @@ public class ProfitTrackerGoldDrops {
     */
     private long currentGoldDropValue;
 
+    // Keeps track of the last gold drop widget, for the purpose of later modification
+    // Specifically needed to ensure visibility for incompatible plugins like "Customize XP Drops"
+    private Widget lastDropWidget;
+
     ProfitTrackerGoldDrops(Client client, ItemManager itemManager, ProfitTrackerConfig config)
     {
         this.client = client;
@@ -92,13 +97,12 @@ public class ProfitTrackerGoldDrops {
 
     }
 
+    /**
+     * We check for scripts of type XPDROPS_SETDROPSIZE to interfere with the XPdrop
+     * and write our own values
+     */
     public void onScriptPreFired(ScriptPreFired scriptPreFired)
     {
-        /*
-        We check for scripts of type XPDROPS_SETDROPSIZE to interfere with the XPdrop
-        and write our own values
-         */
-
         // is this current script type?
         if (scriptPreFired.getScriptId() != XPDROPS_SETDROPSIZE)
         {
@@ -123,7 +127,21 @@ public class ProfitTrackerGoldDrops {
         currentGoldDropValue = 0;
 
         handleXpDrop(widgetId, isThisGoldDrop, goldDropValue);
+    }
 
+    /**
+     * Ensures the last gold xpDrop has not been hidden
+     */
+    public void onScriptPostFired(ScriptPostFired event)
+    {
+        if (event.getScriptId() == ScriptID.XPDROPS_SETDROPSIZE)
+        {
+            if (lastDropWidget != null && config.unhideGoldDrops())
+            {
+                lastDropWidget.setHidden(false);
+                lastDropWidget = null;
+            }
+        }
     }
 
     private void handleXpDrop(int xpDropWidgetId, boolean isThisGoldDrop, long goldDropValue)
@@ -154,6 +172,7 @@ public class ProfitTrackerGoldDrops {
 
         if (isThisGoldDrop)
         {
+            lastDropWidget = xpDropWidget;
             final Widget dropSpriteWidget;
 
             if (xpDropWidgetChildren.length < 2)
