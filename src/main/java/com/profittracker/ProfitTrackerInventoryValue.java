@@ -132,7 +132,28 @@ public class ProfitTrackerInventoryValue {
         log.debug(String.format("calculateItemValue itemId = %d", itemId));
 
         // multiply quantity  by GE value
-        return (long) item.getQuantity() * (itemManager.getItemPrice(itemId));
+        return (long) item.getQuantity() * (getItemValue(itemId));
+    }
+
+    /**
+     * Returns the value of an item, based on the plugin configs value mode. (GE, high alch, shop, etc.)
+     */
+    private int getItemValue(int itemID){
+        switch (config.valueMode()){
+            case GE_TAXED:
+                return (int) Math.ceil(itemManager.getItemPrice(itemID) * 0.98);
+            case LOW_ALCH:
+                return (int) (itemManager.getItemComposition(itemID).getPrice() * 0.4);
+            case SHOP_SPECIAL:
+                return (int) (itemManager.getItemComposition(itemID).getPrice() * 0.55);
+            case HIGH_ALCH:
+                return (int) (itemManager.getItemComposition(itemID).getPrice() * 0.6);
+            case SHOP_OVERSTOCK:
+                return (int) (itemManager.getItemComposition(itemID).getPrice() * 0.1);
+            case GE:
+            default:
+                return itemManager.getItemPrice(itemID);
+        }
     }
 
     public long calculateContainerValue(int containerID)
@@ -206,7 +227,7 @@ public class ProfitTrackerInventoryValue {
             return 0;
         }
         log.debug(String.format("calculateRuneValue runeId = %d", runeId));
-        return (long)(itemManager.getItemPrice(runePouchEnum.getIntValue(runeId))) * runeQuantity;
+        return (long)(getItemValue(runePouchEnum.getIntValue(runeId))) * runeQuantity;
     }
 
     public long calculateInventoryAndEquipmentValue()
@@ -493,5 +514,16 @@ public class ProfitTrackerInventoryValue {
             }
         });
         return itemGain.toArray(new Item[0]);
+    }
+
+    /**
+     * Returns a more readable string representation of the given item array. Function purely for debugging purposes.
+     */
+    public String printItemCollection(Item[] items){
+        StringBuilder outputString = new StringBuilder();
+        for (Item item : items) {
+            outputString.append(itemManager.getItemComposition(item.getId()).getName() + ", " + item.getQuantity() + "\r\n");
+        }
+        return outputString.toString();
     }
 }

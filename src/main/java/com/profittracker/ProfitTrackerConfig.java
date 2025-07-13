@@ -19,7 +19,7 @@ public interface ProfitTrackerConfig extends Config
             position =  0,
             closedByDefault = false
     )
-    String visualSettings = "Visual";
+    String VISUAL_SETTINGS = "Visual";
 
     @ConfigSection(
             name = "Behavior",
@@ -27,13 +27,21 @@ public interface ProfitTrackerConfig extends Config
             position =  1,
             closedByDefault = false
     )
-    String behaviorSettings = "Behavior";
+    String BEHAVIOR_SETTINGS = "Behavior";
+
+    @ConfigSection(
+            name = "Calculation",
+            description = "Settings for price calculation.",
+            position =  2,
+            closedByDefault = false
+    )
+    String CALCULATION_SETTINGS = "Calculation";
 
     @ConfigItem(
             keyName = "goldDrops",
             name = "Show value changes (gold drops)",
             description = "Show each profit increase or decrease.",
-            section = visualSettings
+            section = VISUAL_SETTINGS
     )
     default boolean goldDrops()
     {
@@ -44,7 +52,7 @@ public interface ProfitTrackerConfig extends Config
             keyName = "unhideGoldDrops",
             name = "Unhide value changes",
             description = "Prevents other plugins from hiding value changes if they are enabled.",
-            section = visualSettings
+            section = VISUAL_SETTINGS
     )
     default boolean unhideGoldDrops()
     {
@@ -55,7 +63,7 @@ public interface ProfitTrackerConfig extends Config
             keyName = "autoStart",
             name = "Automatically start tracking",
             description = "Automatically begin tracking profit on session start.",
-            section = behaviorSettings
+            section = BEHAVIOR_SETTINGS
     )
     default boolean autoStart()
     {
@@ -66,7 +74,7 @@ public interface ProfitTrackerConfig extends Config
             keyName = "rememberProfit",
             name = "Remember profit",
             description = "Profit will be remembered between application closes.",
-            section = behaviorSettings
+            section = BEHAVIOR_SETTINGS
     )
     default boolean rememberProfit()
     {
@@ -77,7 +85,7 @@ public interface ProfitTrackerConfig extends Config
             keyName = "shortDrops",
             name = "Shorten drop numbers",
             description = "Shorten drop numbers like 1.2K instead of 1,223, or 10M instead of 10,000,000.",
-            section = visualSettings
+            section = VISUAL_SETTINGS
     )
     default boolean shortDrops()
     {
@@ -88,7 +96,7 @@ public interface ProfitTrackerConfig extends Config
             keyName = "iconStyle",
             name = "Icon style",
             description = "Dynamically adjust the coin icon based on the drop value, or select a specific icon.",
-            section = visualSettings
+            section = VISUAL_SETTINGS
     )
     default ProfitTrackerIconType iconStyle()
     {
@@ -99,7 +107,7 @@ public interface ProfitTrackerConfig extends Config
             keyName = "estimateUntradeables",
             name = "Estimate untradeable item values",
             description = "Some untradeable items will utilize equivalent values of the best items they can convert into.",
-            section = behaviorSettings
+            section = CALCULATION_SETTINGS
     )
     default boolean estimateUntradeables()
     {
@@ -110,11 +118,23 @@ public interface ProfitTrackerConfig extends Config
             keyName = "onlineOnlyRate",
             name = "Online only rate",
             description = "Show profit rate only for time spent logged in.",
-            section = visualSettings
+            position =  0,
+            section = CALCULATION_SETTINGS
     )
     default boolean onlineOnlyRate()
     {
         return false;
+    }
+
+    @ConfigItem(
+            keyName = "valueMode",
+            name = "Value",
+            description = "Method used to estimate the value of items.",
+            section = CALCULATION_SETTINGS
+    )
+    default ProfitTrackerPriceType valueMode()
+    {
+        return ProfitTrackerPriceType.GE;
     }
 }
 
