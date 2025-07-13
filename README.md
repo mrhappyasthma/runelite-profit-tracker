@@ -3,7 +3,7 @@
  
 # Profit Tracker Plugin
 
-This runelite plugin tracks the profit you are generating, according to GE, while money-making.
+This runelite plugin tracks the profit you are generating while money-making. This can be based on GE, alchemy, or shop values.
 ![image](https://user-images.githubusercontent.com/8212109/94357201-5d4c1780-009f-11eb-9c73-17c279edd613.png)
 
 For example, if you are filling vials, the plugin will accumulate profit each time you fill vial, accounting for empty vials price in GE.
@@ -14,8 +14,7 @@ Depositing or withdrawing items will not affect profit value.
 Every change in your inventory, bank, and grand exchange box is monitored and a corresponding profit animation will be shown.
 ![image](https://user-images.githubusercontent.com/8212109/94357070-393c0680-009e-11eb-96a1-8fa7469ee6e1.png)
 
-For example, if you buy in a general shop, an item for 20 coins, which is worth in GE 220 coins,
-ProfitTracker will generate a gold drop animation of 200 coins.
+For example, if you buy in a general shop, an item for 20 coins, which is worth in GE 220 coins, ProfitTracker will generate a gold drop animation of 200 coins.
 
 # How to use
 The plugin will begin tracking when entering the game. The session can be reset by using shift + right-click on the overlay, or by reloading the plugin.
