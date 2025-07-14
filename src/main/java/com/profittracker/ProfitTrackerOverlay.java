@@ -118,12 +118,11 @@ public class ProfitTrackerOverlay extends Overlay {
         if (!inProfitTrackSession)
         {
             // not in session
-            // notify user to reset plugin in order to start
+            // this should not happen if in game, but we can have it just in case
             panelComponent.getChildren().add(TitleComponent.builder()
-                    .text("Reset plugin to start")
+                    .text("Error")
                     .color(Color.RED)
                     .build());
-
         }
 
         // Show tooltip warning on mouse hover if user hasn't opened bank yet
