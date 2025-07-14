@@ -25,6 +25,7 @@ public class ProfitTrackerRecord {
     public Item[] lastPossessionChange;
     /**
      * A sum of all item changes observed. Ideally the same as the difference between starting and current possessions.
+     * Can change if the user decides to adjust manually.
      */
     public Item[] itemDifferenceAccumulated = new Item[0];
 
@@ -38,6 +39,7 @@ public class ProfitTrackerRecord {
         profitAccumulated = 0;
         startingPossessions = new ProfitTrackerPossessions();
         currentPossessions = new ProfitTrackerPossessions();
+        lastPossessionChange = null;
     }
 
     /**
@@ -54,6 +56,7 @@ public class ProfitTrackerRecord {
         if (hardReset) {
             currentPossessions = new ProfitTrackerPossessions();
         }
+        lastPossessionChange = null;
         itemDifferenceAccumulated = new Item[0];
     }
 

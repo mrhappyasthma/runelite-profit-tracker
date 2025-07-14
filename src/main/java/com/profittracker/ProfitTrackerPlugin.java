@@ -19,17 +19,21 @@ import net.runelite.client.events.ClientShutdown;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.events.RuneScapeProfileChanged;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.game.chatbox.ChatboxPanelManager;
+import net.runelite.client.game.chatbox.ChatboxTextInput;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.api.events.VarbitChanged;
 
 import java.util.Arrays;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 @PluginDescriptor(
         name = "Profit Tracker",
-        description = "Tracks profit according to the GE value of your items.",
+        description = "Tracks profit according to the value of your items.",
         tags = {"overlay"}
 )
 public class ProfitTrackerPlugin extends Plugin
@@ -105,6 +109,9 @@ public class ProfitTrackerPlugin extends Plugin
 
     @Inject
     private ClientThread clientThread;
+
+    @Inject
+    private ChatboxPanelManager chatboxPanelManager;
 
     @Override
     protected void startUp() throws Exception
@@ -737,5 +744,36 @@ public class ProfitTrackerPlugin extends Plugin
             accountRecord.profitAccumulated = totalProfit;
             overlay.updateProfitValue(totalProfit);
         }
+    }
+
+    public void adjustProfit()
+    {
+        String lastChange = accountRecord.lastPossessionChange != null ? Long.toString(-inventoryValueObject.calculateItemValue(accountRecord.lastPossessionChange)) : "";
+        ChatboxTextInput chatInput = chatboxPanelManager.openTextInput("Adjust profit")
+                .value(lastChange);
+        chatInput
+                .onChanged((input) -> {
+                    // Ensure numeric while user is typing
+                    Pattern pattern = Pattern.compile("-?\\d*[kmb]?", Pattern.CASE_INSENSITIVE);
+                    Matcher matcher = pattern.matcher(input);
+                    matcher.find();
+                    chatInput.value(matcher.toMatchResult().group(0));
+                })
+                .onDone((input) -> {
+                    // Support values like 10k
+                    input = input.toLowerCase().replace("b", "000000000");
+                    input = input.replace("m", "000000");
+                    input = input.replace("k", "000");
+                    int adjustment = Integer.parseInt(input);
+                    Item[] coinsAdjustment = new Item[] {new Item(ItemID.COINS, adjustment)};
+                    accountRecord.itemDifferenceAccumulated = ProfitTrackerInventoryValue.getItemCollectionSum(accountRecord.itemDifferenceAccumulated, coinsAdjustment);
+                    accountRecord.profitAccumulated += adjustment;
+                    accountRecord.lastPossessionChange = coinsAdjustment;
+                    updateProfitUI();
+                    clientThread.invoke(() -> {
+                            goldDropsObject.requestGoldDrop(adjustment);
+                    });
+                })
+                .build();
     }
 }

@@ -1,6 +1,7 @@
 package com.profittracker;
 import net.runelite.api.Client;
 import net.runelite.api.MenuAction;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.components.LineComponent;
@@ -36,6 +37,7 @@ public class ProfitTrackerOverlay extends Overlay {
     private final PanelComponent panelComponent = new PanelComponent();
 
     private static final String RESET_MENU_OPTION = "Reset";
+    private static final String ADJUST_MENU_OPTION = "Adjust";
     private static final int MILLISECONDS_PER_TICK = 600;
 
     public static String FormatIntegerWithCommas(long value) {
@@ -46,6 +48,8 @@ public class ProfitTrackerOverlay extends Overlay {
     private TooltipManager tooltipManager;
     @Inject
     private Client client;
+    @Inject
+    private ClientThread clientThread;
     @Inject
     private ProfitTrackerOverlay(ProfitTrackerConfig config, ProfitTrackerPlugin trackerPlugin)
     {
@@ -58,11 +62,17 @@ public class ProfitTrackerOverlay extends Overlay {
         inProfitTrackSession = false;
         hasBankData = false;
         ptPlugin = trackerPlugin;
-        this.addMenuEntry(MenuAction.RUNELITE_OVERLAY, RESET_MENU_OPTION, "Profit Tracker",menuEntry ->
+        this.addMenuEntry(MenuAction.RUNELITE_OVERLAY, RESET_MENU_OPTION, "Profit Tracker", menuEntry ->
                 {
                     ptPlugin.resetSession(false);
                     profitValue = 0;
                 });
+        this.addMenuEntry(MenuAction.RUNELITE_OVERLAY, ADJUST_MENU_OPTION, "Profit Tracker", menuEntry ->
+        {
+            clientThread.invoke(ptPlugin::adjustProfit);
+        });
+
+
     }
 
     /**
