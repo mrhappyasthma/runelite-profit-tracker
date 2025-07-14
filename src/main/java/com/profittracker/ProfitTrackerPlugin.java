@@ -170,13 +170,14 @@ public class ProfitTrackerPlugin extends Plugin
         inProfitTrackSession = true;
     }
 
-    public void resetSession(){
+    public void resetSession(boolean hardReset){
         initializeVariables();
         startProfitTrackingSession();
         inventoryValueChanged = true;
         if (accountRecord != null) {
-            accountRecord.reset(configManager);
+            accountRecord.reset(configManager, hardReset);
             accountRecord.save(gson);
+            overlay.updateBankStatus(accountRecord);
         }
     }
 
@@ -203,7 +204,7 @@ public class ProfitTrackerPlugin extends Plugin
             // Check for existing record
             ProfitTrackerRecord record = ProfitTrackerRecord.load(client, configManager, gson);
             if (! config.rememberProfit() && record != null) {
-                record.reset(configManager);
+                record.reset(configManager, true);
             }
 
             if (record == null) {
@@ -222,7 +223,7 @@ public class ProfitTrackerPlugin extends Plugin
         overlay.updateStartTimeMillies(startTickMillis);
         overlay.updateActiveTicks(activeTicks);
 
-        overlay.setBankStatus(accountRecord.currentPossessions.bankItems != null);
+        overlay.updateBankStatus(accountRecord);
 
         previousAccount = accountIdentifier;
     }
@@ -264,7 +265,7 @@ public class ProfitTrackerPlugin extends Plugin
                 inventoryValueChanged = true;
                 // Active ticks will only be 0 if toggling the plugin
                 if (activeTicks == 0) {
-                    resetSession();
+                    resetSession(true);
                 }
             } else {
                 return;
@@ -321,7 +322,7 @@ public class ProfitTrackerPlugin extends Plugin
                 // Bank contents will be null if the bank has no items when first logging in
                 if (inventoryValueObject.getBankContents() == null && accountRecord.currentPossessions.bankItems == null) {
                     accountRecord.updateBankItems(new Item[0]);
-                    overlay.setBankStatus(true);
+                    overlay.updateBankStatus(accountRecord);
                 }
                 break;
             case InterfaceID.GE_COLLECT:
@@ -474,7 +475,7 @@ public class ProfitTrackerPlugin extends Plugin
         accountRecord.updateInventoryItems(newPossessions.inventoryItems);
         if (newPossessions.bankItems != null) {
             accountRecord.updateBankItems(newPossessions.bankItems);
-            overlay.setBankStatus(accountRecord.currentPossessions.bankItems != null);
+            overlay.updateBankStatus(accountRecord);
         }
         if (newPossessions.grandExchangeItems != null) {
             accountRecord.updateGrandExchangeItems(newPossessions.grandExchangeItems);

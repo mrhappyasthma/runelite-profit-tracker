@@ -40,11 +40,20 @@ public class ProfitTrackerRecord {
         currentPossessions = new ProfitTrackerPossessions();
     }
 
-    public void reset(ConfigManager configManager) {
+    /**
+     * Clears record data. Current possessions are not cleared, unless a hard reset is performed.
+     * This is to allow resetting without having to open bank/ge again to learn items.
+     * Hard resets are needed to avoid users turning off the plugin, gaining items, then enabling it,
+     * and instantly getting profit when opening bank or GE.
+     */
+    public void reset(ConfigManager configManager, boolean hardReset) {
         startTickMillies = System.currentTimeMillis();
         ticksOnline = 0;
         profitAccumulated = 0;
         startingPossessions = new ProfitTrackerPossessions();
+        if (hardReset) {
+            currentPossessions = new ProfitTrackerPossessions();
+        }
         itemDifferenceAccumulated = new Item[0];
     }
 

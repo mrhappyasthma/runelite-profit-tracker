@@ -60,7 +60,7 @@ public class ProfitTrackerOverlay extends Overlay {
         ptPlugin = trackerPlugin;
         this.addMenuEntry(MenuAction.RUNELITE_OVERLAY, RESET_MENU_OPTION, "Profit Tracker",menuEntry ->
                 {
-                    ptPlugin.resetSession();
+                    ptPlugin.resetSession(false);
                     profitValue = 0;
                 });
     }
@@ -217,10 +217,10 @@ public class ProfitTrackerOverlay extends Overlay {
         );
     }
 
-    public void setBankStatus(boolean bankReady)
+    public void updateBankStatus(ProfitTrackerRecord accountRecord)
     {
         SwingUtilities.invokeLater(() ->
-                hasBankData = bankReady
+                hasBankData = accountRecord.currentPossessions.bankItems != null
         );
     }
 
