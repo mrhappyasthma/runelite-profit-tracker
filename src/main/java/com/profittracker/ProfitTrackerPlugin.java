@@ -259,7 +259,7 @@ public class ProfitTrackerPlugin extends Plugin
 
         if (!inProfitTrackSession)
         {
-            if (accountRecord != null && config.autoStart()){
+            if (accountRecord != null){
                 overlay.startSession();
                 inProfitTrackSession = true;
                 inventoryValueChanged = true;
