@@ -714,7 +714,6 @@ public class ProfitTrackerPlugin extends Plugin
     public void onScriptPreFired(ScriptPreFired scriptPreFired)
     {
         goldDropsObject.onScriptPreFired(scriptPreFired);
-
     }
 
     @Subscribe
@@ -735,6 +734,18 @@ public class ProfitTrackerPlugin extends Plugin
         // Allows hot swapping between price calculation methods non-destructively
         if (configChanged.getGroup().equals(ProfitTrackerConfig.GROUP)) {
             clientThread.invoke(this::updateProfitUI);
+            clientThread.invoke(() -> {
+                if (config.goldDrops()) {
+                    String[] goldDropVisuals = {"color", "style", "drop"};
+                    for (String containerMenuOption : goldDropVisuals) {
+                        if (configChanged.getKey().toLowerCase().contains(containerMenuOption)) {
+                            // Visual indicator to user when they mess with settings, so they can see
+                            goldDropsObject.requestGoldDrop(0);
+                            break;
+                        }
+                    }
+                }
+            });
         }
     }
 
