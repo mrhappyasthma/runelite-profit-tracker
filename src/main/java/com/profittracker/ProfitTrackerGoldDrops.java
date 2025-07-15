@@ -6,8 +6,8 @@ import net.runelite.api.events.ScriptPostFired;
 import net.runelite.api.events.ScriptPreFired;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.ItemID;
-import net.runelite.api.gameval.VarbitID;
 import net.runelite.api.widgets.Widget;
+import net.runelite.api.widgets.WidgetPositionMode;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.util.AsyncBufferedImage;
 import net.runelite.client.util.ImageUtil;
@@ -62,10 +62,6 @@ public class ProfitTrackerGoldDrops {
     // XpDropPlugin which looks for those and might change text color
     private static final int XPDROP_SKILL = Skill.FISHING.ordinal();
 
-    // Value to send in the fake xp drop script. Doesn't matter at all
-    // since we don't use this value, but we use currentGoldDropValue
-    private static final int XPDROP_VALUE = 6;
-
     /*
     Singletons which will be provided at creation by the plugin
      */
@@ -80,6 +76,7 @@ public class ProfitTrackerGoldDrops {
       2. to know to catch the next fake xpdrop in onScriptPreFired
     */
     private long currentGoldDropValue;
+    private boolean doingGoldDrop;
 
     // Keeps track of the last gold drop widget, for the purpose of later modification
     // Specifically needed to ensure visibility for incompatible plugins like "Customize XP Drops"
@@ -94,7 +91,7 @@ public class ProfitTrackerGoldDrops {
         prepareCoinSprite();
 
         currentGoldDropValue = 0L;
-
+        doingGoldDrop = false;
     }
 
     /**
@@ -120,13 +117,13 @@ public class ProfitTrackerGoldDrops {
         final int widgetId = intStack[intStackSize - 4];
 
         // extract information from currentGoldDropValue
-        boolean isThisGoldDrop =   (currentGoldDropValue != 0);
-        long     goldDropValue =     currentGoldDropValue;
+        long goldDropValue = currentGoldDropValue;
+
+        handleXpDrop(widgetId, doingGoldDrop, goldDropValue);
 
         // done with this gold drop anyway
         currentGoldDropValue = 0;
-
-        handleXpDrop(widgetId, isThisGoldDrop, goldDropValue);
+        doingGoldDrop = false;
     }
 
     /**
@@ -136,9 +133,30 @@ public class ProfitTrackerGoldDrops {
     {
         if (event.getScriptId() == ScriptID.XPDROPS_SETDROPSIZE)
         {
-            if (lastDropWidget != null && config.unhideGoldDrops())
+            if (lastDropWidget != null)
             {
-                lastDropWidget.setHidden(false);
+                if (config.unhideGoldDrops()) {
+                    lastDropWidget.setHidden(false);
+                }
+                Widget dropTextWidget = lastDropWidget.getChildren()[0];
+                Widget dropSpriteWidget = lastDropWidget.getChildren()[1];
+                if (config.colorGoldDrops())
+                {
+                    if (dropTextWidget.getText().startsWith("-"))
+                    {
+                        dropTextWidget.setTextColor(config.colorOnLoss().getRGB());
+                    } else {
+                        dropTextWidget.setTextColor(config.colorOnProfit().getRGB());
+                    }
+                }
+
+                Graphics graphics = client.getCanvas().getGraphics();
+                int stringWidth = graphics.getFontMetrics().stringWidth(dropTextWidget.getText());
+                // Shift sprite position next to text
+                dropSpriteWidget.setOriginalX(stringWidth);
+                dropSpriteWidget.setXPositionMode(WidgetPositionMode.ABSOLUTE_RIGHT);
+                dropSpriteWidget.revalidate();
+
                 lastDropWidget = null;
             }
         }
@@ -187,11 +205,6 @@ public class ProfitTrackerGoldDrops {
 
             xpDropToGoldDrop(dropTextWidget, dropSpriteWidget, goldDropValue);
         }
-        else
-        {
-            // reset text color for all regular xpdrops
-            resetXpDropTextColor(dropTextWidget);
-        }
     }
 
     private void xpDropToGoldDrop(Widget dropTextWidget, Widget dropSpriteWidget, long goldDropValue)
@@ -200,7 +213,8 @@ public class ProfitTrackerGoldDrops {
         Change xpdrop icon and text, to make a gold drop
          */
 
-        if (config.shortDrops()) {
+        if (config.shortDrops() || goldDropValue == 0) {
+            // 0 value gold drops are produced by config changes to help the user see their changes
             dropTextWidget.setText(formatGoldDropText(goldDropValue));
         } else {
             // Remove disabled icon from string
@@ -210,20 +224,9 @@ public class ProfitTrackerGoldDrops {
             dropTextWidget.setText((goldDropValue < 0 ? "-" : "") + formattedValue);
         }
 
-        if (goldDropValue > 0)
-        {
-            // green text for profit
-            dropTextWidget.setTextColor(Color.GREEN.getRGB());
-        }
-        else
-        {
-            // red for loss
-            dropTextWidget.setTextColor(Color.RED.getRGB());
-        }
-
         // change skill sprite to coin sprite
         if (config.iconStyle() == ProfitTrackerIconType.DYNAMIC){
-            for (int spriteIndex = 0; spriteIndex < COINS_SPRITES.length; spriteIndex++){
+            for (int spriteIndex = 1; spriteIndex < COINS_SPRITES.length; spriteIndex++){
                 if (Math.abs(goldDropValue) < COINS_SPRITES[spriteIndex]){
                     dropSpriteWidget.setSpriteId(COINS_SPRITE_ID_START - spriteIndex + 1);
                     break;
@@ -277,42 +280,17 @@ public class ProfitTrackerGoldDrops {
 
         // save the value and mark an ongoing gold drop
         currentGoldDropValue = amount;
+        doingGoldDrop = true;
+
+        String formattedAmount = formatGoldDropText(currentGoldDropValue);
 
         // Create a fake xp drop. the 2 last arguments don't matter:
         // 1. skill ordinal - we will replace the icon anyway
         // 2. value - since we want to be able to pass negative numbers, we pass the value using
         // currentGoldDropValue instead of this argument
-        String formattedAmount = formatGoldDropText(currentGoldDropValue);
-
-        if (config.shortDrops()) {
-            /*
-            Modifying the value of xpdrops later can cause substantial dead space between the text and sprite.
-            Passing a value into the runScript for xpdrops will set the sprite position based on the text sent
-            taking up more/less space. The particular character also makes minor adjustments, as the rendering is
-            not a monospace font. This could be eliminated if we can figure out how to reposition the sprite, or
-            eliminate the invisible error icon that causes the dead space, and get the rendered drop to recalculate
-            sprite position based on our custom text.
-             */
-            int sizeAdjustingValue = 1;
-            sizeAdjustingValue = formattedAmount.length() > 3 ? 6 : sizeAdjustingValue;
-            sizeAdjustingValue = formattedAmount.length() > 4 ? 60 : sizeAdjustingValue;
-            sizeAdjustingValue = formattedAmount.length() > 4 && formattedAmount.contains(".") ? 10 : sizeAdjustingValue;
-            sizeAdjustingValue = formattedAmount.length() == 4 && !formattedAmount.contains(".") ? 11 : sizeAdjustingValue;
-            client.runScript(XPDROP_DISABLED, XPDROP_SKILL, sizeAdjustingValue);
-        }
-        else
-        {
-            client.runScript(XPDROP_DISABLED, XPDROP_SKILL, (int) Math.abs(currentGoldDropValue));
-        }
-    }
-
-    private void resetXpDropTextColor(Widget xpDropTextWidget)
-    {
-        // taken from XpDropPlugin
-        EnumComposition colorEnum = client.getEnum(EnumID.XPDROP_COLORS);
-        int defaultColorId = client.getVarbitValue(VarbitID.XPDROPS_COLOUR);
-        int color = colorEnum.getIntValue(defaultColorId);
-        xpDropTextWidget.setTextColor(color);
+        // Otherwise, the value here is what would be displayed by other plugins that don't account
+        // for our widget changes.
+        client.runScript(XPDROP_DISABLED, XPDROP_SKILL, (int) Math.abs(currentGoldDropValue != 0 ? currentGoldDropValue : 1));
     }
 
     private String formatGoldDropText(long goldDropValue)
