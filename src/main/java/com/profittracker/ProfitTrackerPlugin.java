@@ -331,6 +331,7 @@ public class ProfitTrackerPlugin extends Plugin
                     accountRecord.updateBankItems(new Item[0]);
                     overlay.updateBankStatus(accountRecord);
                 }
+                bankOpened = true;
                 break;
             case InterfaceID.GE_COLLECT:
             case InterfaceID.GE_OFFERS:
