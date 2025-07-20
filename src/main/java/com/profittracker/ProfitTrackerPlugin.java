@@ -315,15 +315,13 @@ public class ProfitTrackerPlugin extends Plugin
             grandExchangeValueChanged = false;
             depositingItem = false;
         }
-        if (closingWidgetId != 0) {
-            setWidgetClosedVariables(closingWidgetId);
-            closingWidgetId = 0;
-        }
+        resetWidgetClosedVariables();
     }
 
     @Subscribe
     public void onWidgetLoaded(WidgetLoaded event)
     {
+        boolean isStorage = true;
         switch (event.getGroupId()) {
             case InterfaceID.BANKMAIN:
                 // Bank contents will be null if the bank has no items when first logging in
@@ -348,6 +346,15 @@ public class ProfitTrackerPlugin extends Plugin
             case InterfaceID.FARMING_TOOLS:
                 untrackedStorageOpened = true;
                 break;
+            default:
+                isStorage = false;
+                break;
+        }
+        if (isStorage) {
+            // If a user is flipping through multiple storages tick after tick, and moving items in/out
+            // tracking can get complicated.
+            // So we reset immediately to avoid longer term desyncs, like jumping between GE and bank
+            resetWidgetClosedVariables();
         }
     }
 
@@ -372,28 +379,31 @@ public class ProfitTrackerPlugin extends Plugin
     }
 
     /**
-     * Clears the associated variable for the tracked storage for the given widget groupID
+     * Clears the associated variable for the last opened storage widget
      * Should be called with closingWidgetId
      */
-    private void setWidgetClosedVariables(int groupId){
-        switch (groupId) {
-            case InterfaceID.BANKMAIN:
-                bankOpened = false;
-                break;
-            case InterfaceID.HUNTSMANS_KIT:
-            case InterfaceID.SEED_VAULT:
-            case InterfaceID.TACKLE_BOX_MAIN:
-            case InterfaceID.FARMING_TOOLS:
-                untrackedStorageOpened = false;
-                break;
-            case InterfaceID.GE_COLLECT:
-            case InterfaceID.GE_OFFERS:
-                grandExchangeOpened = false;
-                break;
-            case InterfaceID.BANK_DEPOSIT_IMP:
-            case InterfaceID.BANK_DEPOSITBOX:
-                depositBoxOpened = false;
-                break;
+    private void resetWidgetClosedVariables(){
+        if (closingWidgetId != 0) {
+            switch (closingWidgetId) {
+                case InterfaceID.BANKMAIN:
+                    bankOpened = false;
+                    break;
+                case InterfaceID.HUNTSMANS_KIT:
+                case InterfaceID.SEED_VAULT:
+                case InterfaceID.TACKLE_BOX_MAIN:
+                case InterfaceID.FARMING_TOOLS:
+                    untrackedStorageOpened = false;
+                    break;
+                case InterfaceID.GE_COLLECT:
+                case InterfaceID.GE_OFFERS:
+                    grandExchangeOpened = false;
+                    break;
+                case InterfaceID.BANK_DEPOSIT_IMP:
+                case InterfaceID.BANK_DEPOSITBOX:
+                    depositBoxOpened = false;
+                    break;
+            }
+            closingWidgetId = 0;
         }
     }
 
