@@ -60,6 +60,18 @@ public class ProfitTrackerRecord {
         itemDifferenceAccumulated = new Item[0];
     }
 
+    public void updateItems(ProfitTrackerPossessions newPossessions, ProfitTrackerOverlay overlay){
+        this.updateInventoryItems(newPossessions.inventoryItems);
+        if (newPossessions.bankItems != null) {
+            this.updateBankItems(newPossessions.bankItems);
+            overlay.updateBankStatus(this);
+        }
+        if (newPossessions.grandExchangeItems != null) {
+            this.updateGrandExchangeItems(newPossessions.grandExchangeItems);
+        }
+        this.updateUntrackedItems(newPossessions.untrackedStorageItems);
+    }
+
     public void updateInventoryItems(Item[] items){
         if (startingPossessions.inventoryItems == null) {
             startingPossessions.inventoryItems = items;

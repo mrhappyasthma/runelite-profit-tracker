@@ -455,9 +455,15 @@ public class ProfitTrackerPlugin extends Plugin
             boolean bankingItemsWithoutWidget = (bankOpened || depositingItem || depositBoxOpened) && inventoryValueObject.getBankContents() == null && !untrackedStorageOpened;
             // If bank/deposit box/depositing flag, any lost items are in bank, any gained items came from bank
             if (bankingItemsWithoutWidget) {
-                Item[] bankChange = ProfitTrackerInventoryValue.getItemCollectionDifference(rawPossessionDifference, new Item[0]);
-                newPossessions.bankItems = ProfitTrackerInventoryValue.getItemCollectionSum(accountRecord.currentPossessions.bankItems, bankChange);
                 depositingItem = false;
+                Item[] bankChange = ProfitTrackerInventoryValue.getItemCollectionDifference(rawPossessionDifference, new Item[0]);
+                if (accountRecord.currentPossessions.bankItems != null) {
+                    newPossessions.bankItems = ProfitTrackerInventoryValue.getItemCollectionSum(accountRecord.currentPossessions.bankItems, bankChange);
+                } else {
+                    // Bank yet to be opened, can't deposit anything, as then it would be like it originally had almost nothing
+                    accountRecord.updateItems(newPossessions, overlay);
+                    return 0;
+                }
             }
             // If ge opened, gained items pull from ge, items banked will cause temporary desync
             if (grandExchangeOpened && !grandExchangeValueChanged) {
@@ -490,15 +496,7 @@ public class ProfitTrackerPlugin extends Plugin
 
         // update prevInventoryValue for future calculations anyway!
         //prevInventoryValue = newInventoryValue;
-        accountRecord.updateInventoryItems(newPossessions.inventoryItems);
-        if (newPossessions.bankItems != null) {
-            accountRecord.updateBankItems(newPossessions.bankItems);
-            overlay.updateBankStatus(accountRecord);
-        }
-        if (newPossessions.grandExchangeItems != null) {
-            accountRecord.updateGrandExchangeItems(newPossessions.grandExchangeItems);
-        }
-        accountRecord.updateUntrackedItems(newPossessions.untrackedStorageItems);
+        accountRecord.updateItems(newPossessions, overlay);
 
         return newProfit;
     }
