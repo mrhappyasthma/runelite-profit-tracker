@@ -789,9 +789,9 @@ public class ProfitTrackerPlugin extends Plugin
                     accountRecord.itemDifferenceAccumulated = ProfitTrackerInventoryValue.getItemCollectionSum(accountRecord.itemDifferenceAccumulated, coinsAdjustment);
                     accountRecord.profitAccumulated += adjustment;
                     accountRecord.lastPossessionChange = coinsAdjustment;
-                    updateProfitUI();
                     clientThread.invoke(() -> {
-                            goldDropsObject.requestGoldDrop(adjustment);
+                        updateProfitUI();
+                        goldDropsObject.requestGoldDrop(adjustment);
                     });
                 })
                 .build();
