@@ -206,7 +206,6 @@ public class ProfitTrackerPlugin extends Plugin
             accountRecord = null;
         }
 
-        //configManager.getRSProfileConfigurationKeys(ProfitTrackerConfig.GROUP,configManager.getRSProfileKey(),"record_");
         if (accountRecord == null) {
             // Check for existing record
             ProfitTrackerRecord record = ProfitTrackerRecord.load(client, configManager, gson);

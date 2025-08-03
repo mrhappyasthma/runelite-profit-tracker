@@ -56,6 +56,8 @@ public class ProfitTrackerInventoryValue {
             InventoryID.GE_COLLECT_7
     };
 
+    private static final double GE_TAX = 0.02;
+
     private final ItemManager itemManager;
     private final Client client;
     @Inject
@@ -141,15 +143,15 @@ public class ProfitTrackerInventoryValue {
     private int getItemValue(int itemID){
         switch (config.valueMode()){
             case GE_TAXED:
-                return (int) Math.ceil(itemManager.getItemPrice(itemID) * 0.98);
+                return (int) Math.ceil(itemManager.getItemPrice(itemID) * (1 - GE_TAX));
             case LOW_ALCH:
-                return (int) (itemManager.getItemComposition(itemID).getPrice() * 0.4);
+                return (int) (itemManager.getItemComposition(itemID).getPrice() * ProfitTrackerShopValues.COMMON_LOW_ALCH);
             case SHOP_SPECIAL:
-                return (int) (itemManager.getItemComposition(itemID).getPrice() * 0.55);
+                return (int) (itemManager.getItemComposition(itemID).getPrice() * ProfitTrackerShopValues.SPECIAL_55);
             case HIGH_ALCH:
-                return (int) (itemManager.getItemComposition(itemID).getPrice() * 0.6);
+                return (int) (itemManager.getItemComposition(itemID).getPrice() * ProfitTrackerShopValues.SPECIAL_60_HIGH_ALCH);
             case SHOP_OVERSTOCK:
-                return (int) (itemManager.getItemComposition(itemID).getPrice() * 0.1);
+                return (int) (itemManager.getItemComposition(itemID).getPrice() * ProfitTrackerShopValues.MINIMUM_PRICE);
             case GE:
             default:
                 return itemManager.getItemPrice(itemID);
