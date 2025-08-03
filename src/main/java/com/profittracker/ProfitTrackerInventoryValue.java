@@ -411,6 +411,11 @@ public class ProfitTrackerInventoryValue {
                     //Otherwise using them and opening the bank would cause confusing small profits
                     extraItems = ArrayUtils.add(extraItems,new Item(ItemID.MAGIC_IMP_BOX,resultItems[i].getQuantity()));
                     break;
+                case ItemID.FORESTRY_BASKET_CLOSED:
+                case ItemID.FORESTRY_BASKET_OPEN:
+                    //Forestry basket can be dismantled to return log brace at no cost
+                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.FORESTRY_STURDY_HARNESS,resultItems[i].getQuantity()));
+                    break;
                 //TODO Seedlings: Have unwatered seedlings turn into the seed + pot, and the watered versions into saplings
                 default:
                     replaceItem = false;
