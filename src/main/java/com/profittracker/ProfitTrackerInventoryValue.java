@@ -386,10 +386,6 @@ public class ProfitTrackerInventoryValue {
                     long roteValue = calculateItemValue(new Item(ItemID.RING_OF_ELEMENTS, 1));
                     extraItems = ArrayUtils.add(extraItems,new Item(ItemID.COINS,(int)(resultItems[i].getQuantity() * roteValue / 400)));
                     break;
-                case ItemID.VILLAGE_TRADE_STICKS: //Trading sticks for gout tubers
-                    long tuberValue = calculateItemValue(new Item(ItemID.VILLAGE_RARE_TUBER, 1));
-                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.COINS,(int)(resultItems[i].getQuantity() * tuberValue / 120)));
-                    break;
                 case ItemID.FOSSIL_MERMAID_TEAR: //Mermaid tears for merfolk trident
                     long tridentValue = calculateItemValue(new Item(ItemID.MERFOLK_TRIDENT, 1));
                     extraItems = ArrayUtils.add(extraItems,new Item(ItemID.COINS,(int)(resultItems[i].getQuantity() * tridentValue / 400)));
