@@ -350,6 +350,12 @@ public class ProfitTrackerPlugin extends Plugin
                 break;
         }
         if (isStorage) {
+            if (closingWidgetId == event.getGroupId()) {
+                // GE can close and open immediately when using the modify button, which would otherwise cause temporary
+                // profit desync that is stuck until another offer changes. Resetting prevents accidentally thinking storage
+                // is closed the first tick it opens after having just closed.
+                closingWidgetId = 0;
+            }
             // If a user is flipping through multiple storages tick after tick, and moving items in/out
             // tracking can get complicated.
             // So we reset immediately to avoid longer term desyncs, like jumping between GE and bank
