@@ -180,5 +180,17 @@ public interface ProfitTrackerConfig extends Config
     {
         return Color.RED;
     }
+
+    @ConfigItem(
+            keyName = "showOverlay",
+            name = "Show overlay",
+            description = "Shows an overlay with information about the recorded data, like time, profit, or rate.",
+            section = VISUAL_SETTINGS,
+            position = 7
+    )
+    default boolean showOverlay()
+    {
+        return true;
+    }
 }
 

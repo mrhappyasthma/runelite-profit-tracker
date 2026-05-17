@@ -120,6 +120,10 @@ public class ProfitTrackerOverlay extends Overlay {
         // Not sure how this can occur, but it was recommended to do so
         panelComponent.getChildren().clear();
 
+        if (!ptConfig.showOverlay()){
+            return null;
+        }
+
         // Build overlay title
         panelComponent.getChildren().add(TitleComponent.builder()
                 .text(titleText)
