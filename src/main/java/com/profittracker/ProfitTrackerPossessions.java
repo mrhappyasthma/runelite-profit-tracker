@@ -25,19 +25,26 @@ public class ProfitTrackerPossessions {
 
     /**
      * If any collection is null, it will instead use the items from the given possessions
+     * Returns true if any null collection was given data
      */
-    public void fillNullItems(ProfitTrackerPossessions knownPossessions){
+    public boolean fillNullItems(ProfitTrackerPossessions knownPossessions){
+        boolean filled = false;
         if (inventoryItems == null){
             inventoryItems = knownPossessions.inventoryItems;
+            filled |= inventoryItems != null;
         }
         if (bankItems == null){
             bankItems = knownPossessions.bankItems;
+            filled |= bankItems != null;
         }
         if (grandExchangeItems == null){
             grandExchangeItems = knownPossessions.grandExchangeItems;
+            filled |= grandExchangeItems != null;
         }
         if (untrackedStorageItems == null){
             untrackedStorageItems = knownPossessions.untrackedStorageItems;
+            filled |= untrackedStorageItems != null;
         }
+        return filled;
     }
 }

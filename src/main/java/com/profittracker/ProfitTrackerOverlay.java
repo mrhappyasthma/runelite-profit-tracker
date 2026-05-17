@@ -31,6 +31,7 @@ public class ProfitTrackerOverlay extends Overlay {
     private String lastTimeDisplay;
     private long lastProfitValue;
     private int lastWidth;
+    private String errorString = "Error";
 
     private final ProfitTrackerConfig ptConfig;
     private final ProfitTrackerPlugin ptPlugin;
@@ -130,7 +131,7 @@ public class ProfitTrackerOverlay extends Overlay {
             // not in session
             // this should not happen if in game, but we can have it just in case
             panelComponent.getChildren().add(TitleComponent.builder()
-                    .text("Error")
+                    .text(errorString)
                     .color(Color.RED)
                     .build());
         }
@@ -222,6 +223,16 @@ public class ProfitTrackerOverlay extends Overlay {
                 {
                     inProfitTrackSession = true;
                     lastWidth = 0;
+                    errorString = "Error";
+                }
+        );
+    }
+
+    public void setErrorMessage(String newMessage)
+    {
+        SwingUtilities.invokeLater(() ->
+                {
+                    errorString = newMessage;
                 }
         );
     }

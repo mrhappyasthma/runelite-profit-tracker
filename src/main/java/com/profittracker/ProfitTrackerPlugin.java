@@ -17,6 +17,7 @@ import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ClientShutdown;
 import net.runelite.client.events.ConfigChanged;
+import net.runelite.client.events.ProfileChanged;
 import net.runelite.client.events.RuneScapeProfileChanged;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.chatbox.ChatboxPanelManager;
@@ -52,7 +53,6 @@ public class ProfitTrackerPlugin extends Plugin
     private long startTickMillis;
     private long activeTicks;
 
-    private boolean skipTickForProfitCalculation;
     private boolean inventoryValueChanged;
     private boolean bankValueChanged;
     private boolean grandExchangeValueChanged;
@@ -137,9 +137,6 @@ public class ProfitTrackerPlugin extends Plugin
         startTickMillis = 0;
         activeTicks = 0;
 
-        // skip profit calculation for first tick, to initialize first inventory value
-        skipTickForProfitCalculation = true;
-
         inventoryValueChanged = false;
 
         bankValueChanged = false;
@@ -196,6 +193,7 @@ public class ProfitTrackerPlugin extends Plugin
     {
         String accountIdentifier = ProfitTrackerRecord.getAccountRecordKey(client);
         if (accountIdentifier == null) {
+            overlay.setErrorMessage("Account ID Null");
             return;
         }
         boolean changedAccounts = previousAccount != null && ! previousAccount.contentEquals(accountIdentifier);
@@ -235,9 +233,11 @@ public class ProfitTrackerPlugin extends Plugin
     }
 
     @Subscribe
-    public void onRuneScapeProfileChanged(RuneScapeProfileChanged e)
-    {
-        checkAccount();
+    public void onGameStateChanged(GameStateChanged event) {
+        GameState state = event.getGameState();
+        if (state == GameState.LOGGED_IN) {
+            checkAccount();
+        }
     }
 
     @Override
@@ -430,11 +430,16 @@ public class ProfitTrackerPlugin extends Plugin
         if (grandExchangeValueChanged) {
             newPossessions.grandExchangeItems = inventoryValueObject.getGrandExchangeContents();
         }
-        accountRecord.currentPossessions.fillNullItems(newPossessions);
+        if (accountRecord.currentPossessions.fillNullItems(newPossessions)) {
+            // Gaining substantial new information, like opening the bank for the first time,
+            // learning inventory items, or equipped items. Save this to file to ensure the start point doesn't shift
+            // after a runelite crash.
+            accountRecord.save(gson);
+        }
         newPossessions.fillNullItems(accountRecord.currentPossessions);
         Item[] newItems = newPossessions.getItems();
 
-        if (!skipTickForProfitCalculation && accountRecord.currentPossessions.inventoryItems != null && newItems != null)
+        if (accountRecord.currentPossessions.inventoryItems != null && newItems != null)
         {
             // calculate new profit
             possessionDifference = inventoryValueObject.getItemCollectionDifference(accountRecord.currentPossessions.getItems(), newItems, config.estimateUntradeables());
@@ -446,8 +451,6 @@ public class ProfitTrackerPlugin extends Plugin
         {
             /* first time calculation / banking / equipping */
             log.debug("Skipping profit calculation!");
-
-            skipTickForProfitCalculation = false;
         }
 
         Item[] rawPossessionDifference = new Item[0];
@@ -627,7 +630,6 @@ public class ProfitTrackerPlugin extends Plugin
                     case "empty":
                     case "fill":
                     case "use":
-                        skipTickForProfitCalculation = false;
                 }
         }
 
@@ -664,8 +666,6 @@ public class ProfitTrackerPlugin extends Plugin
                     case "empty":
                     case "fill":
                     case "use":
-                        // Ensure item containers
-                        skipTickForProfitCalculation = false;
                 }
         }
 
@@ -712,8 +712,6 @@ public class ProfitTrackerPlugin extends Plugin
                     case "empty":
                     case "fill":
                     case "use":
-                        // Ensure item containers
-                        skipTickForProfitCalculation = false;
                 }
         }
     }
@@ -739,7 +737,9 @@ public class ProfitTrackerPlugin extends Plugin
     @Subscribe
     public void onClientShutdown(ClientShutdown event)
     {
-        accountRecord.save(gson);
+        if (accountRecord != null) {
+            accountRecord.save(gson);
+        }
     }
 
     @Subscribe
