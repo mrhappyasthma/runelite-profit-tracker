@@ -448,6 +448,10 @@ public class ProfitTrackerInventoryValue {
                 .collect(Collectors.toMap(Item::getId, Item::getQuantity, Integer::sum));
     }
 
+    public Item[] removePlaceholders(Item[] items){
+        return removePlaceholders(items, itemManager);
+    }
+
     private static Item[] removePlaceholders(Item[] items, ItemManager manager){
         return Arrays.stream(items)
                 .filter(item -> item.getId() != EMPTY_SLOT_ITEMID)
