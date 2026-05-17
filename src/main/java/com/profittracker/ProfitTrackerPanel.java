@@ -25,6 +25,10 @@ public class ProfitTrackerPanel extends PluginPanel
     private final JPanel listPanel;
     private final Runnable onReset;
     private ProfitTrackerPanelItem[] items = new ProfitTrackerPanelItem[0];
+    private ProfitTrackerPanelItem[] lastChangeItems = new ProfitTrackerPanelItem[0];
+    private boolean lastChangeCollapsed;
+    private boolean gainedCollapsed;
+    private boolean lostCollapsed;
 
     public ProfitTrackerPanel(Runnable onReset)
     {
@@ -47,7 +51,7 @@ public class ProfitTrackerPanel extends PluginPanel
         add(createSpacer());
 
         listPanel = new JPanel();
-        listPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        listPanel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
         listPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         listPanel.setLayout(new BoxLayout(listPanel, BoxLayout.Y_AXIS));
         add(listPanel);
@@ -55,9 +59,10 @@ public class ProfitTrackerPanel extends PluginPanel
         refresh();
     }
 
-    public void setItems(ProfitTrackerPanelItem[] items)
+    public void setItems(ProfitTrackerPanelItem[] items, ProfitTrackerPanelItem[] lastChangeItems)
     {
         this.items = items != null ? items : new ProfitTrackerPanelItem[0];
+        this.lastChangeItems = lastChangeItems != null ? lastChangeItems : new ProfitTrackerPanelItem[0];
         refresh();
     }
 
@@ -85,9 +90,14 @@ public class ProfitTrackerPanel extends PluginPanel
 
                 listPanel.add(createNetTotalPanel(gainedItems, lostItems));
                 listPanel.add(createSpacer());
-                listPanel.add(createSection("Gained", gainedItems, "No gained items yet."));
+                listPanel.add(createCollapsibleSection("Last Change", lastChangeItems, "No tracked changes yet.",
+                        lastChangeCollapsed, collapsed -> lastChangeCollapsed = collapsed));
                 listPanel.add(createSpacer());
-                listPanel.add(createSection("Lost", lostItems, "No lost items yet."));
+                listPanel.add(createCollapsibleSection("Gained", gainedItems, "No gained items yet.",
+                        gainedCollapsed, collapsed -> gainedCollapsed = collapsed));
+                listPanel.add(createSpacer());
+                listPanel.add(createCollapsibleSection("Lost", lostItems, "No lost items yet.",
+                        lostCollapsed, collapsed -> lostCollapsed = collapsed));
             }
 
             listPanel.revalidate();
@@ -122,7 +132,7 @@ public class ProfitTrackerPanel extends PluginPanel
     {
         JPanel sectionPanel = new JPanel();
         sectionPanel.setLayout(new BoxLayout(sectionPanel, BoxLayout.Y_AXIS));
-        sectionPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        sectionPanel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
         sectionPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         sectionPanel.add(createSectionHeader(title, getProfitTotal(sectionItems)));
@@ -145,6 +155,30 @@ public class ProfitTrackerPanel extends PluginPanel
                 sectionPanel.add(createFallbackRow(item));
             }
         }
+
+        return sectionPanel;
+    }
+
+    private JPanel createCollapsibleSection(String title, ProfitTrackerPanelItem[] sectionItems, String emptyMessage,
+                                            boolean collapsed, SectionCollapseHandler collapseHandler)
+    {
+        JPanel sectionPanel = new JPanel();
+        sectionPanel.setLayout(new BoxLayout(sectionPanel, BoxLayout.Y_AXIS));
+        sectionPanel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+        sectionPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JPanel contentPanel = new JPanel();
+        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
+        contentPanel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+        contentPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JButton toggleButton = createSectionToggle(title, getProfitTotal(sectionItems), contentPanel, collapsed, collapseHandler);
+        sectionPanel.add(toggleButton);
+        sectionPanel.add(createSpacer());
+
+        rebuildSectionContent(contentPanel, sectionItems, emptyMessage);
+        contentPanel.setVisible(!collapsed);
+        sectionPanel.add(contentPanel);
 
         return sectionPanel;
     }
@@ -178,7 +212,8 @@ public class ProfitTrackerPanel extends PluginPanel
     {
         JPanel headerPanel = new JPanel();
         headerPanel.setLayout(new BoxLayout(headerPanel, BoxLayout.X_AXIS));
-        headerPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        headerPanel.setBackground(ColorScheme.BORDER_COLOR);
+        headerPanel.setBorder(new EmptyBorder(4, 6, 4, 6));
         headerPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         JLabel sectionLabel = new JLabel(title);
@@ -195,12 +230,84 @@ public class ProfitTrackerPanel extends PluginPanel
         return headerPanel;
     }
 
+    private JButton createSectionToggle(String title, long total, JPanel contentPanel, boolean collapsed,
+                                        SectionCollapseHandler collapseHandler)
+    {
+        JButton toggleButton = new JButton();
+        toggleButton.setLayout(new BoxLayout(toggleButton, BoxLayout.X_AXIS));
+        toggleButton.setAlignmentX(Component.LEFT_ALIGNMENT);
+        toggleButton.setBackground(ColorScheme.BORDER_COLOR);
+        toggleButton.setBorderPainted(false);
+        toggleButton.setFocusPainted(false);
+        toggleButton.setContentAreaFilled(true);
+        toggleButton.setHorizontalAlignment(SwingConstants.LEFT);
+        toggleButton.setOpaque(true);
+        toggleButton.setBorder(new EmptyBorder(4, 6, 4, 6));
+
+        JLabel sectionLabel = new JLabel();
+        sectionLabel.setForeground(Color.WHITE);
+        sectionLabel.setFont(FontManager.getRunescapeBoldFont());
+
+        JLabel totalLabel = new JLabel(formatProfit(total));
+        totalLabel.setForeground(total >= 0 ? Color.GREEN : Color.RED);
+        totalLabel.setFont(createLargeFont());
+
+        toggleButton.add(sectionLabel);
+        toggleButton.add(Box.createHorizontalGlue());
+        toggleButton.add(totalLabel);
+
+        final boolean[] sectionCollapsed = {collapsed};
+        Runnable updateButtonText = () -> sectionLabel.setText(String.format("%-2s%s", sectionCollapsed[0] ? "+" : "-", title));
+        updateButtonText.run();
+
+        toggleButton.addActionListener(e ->
+        {
+            sectionCollapsed[0] = !sectionCollapsed[0];
+            collapseHandler.setCollapsed(sectionCollapsed[0]);
+            contentPanel.setVisible(!sectionCollapsed[0]);
+            updateButtonText.run();
+            revalidate();
+            repaint();
+        });
+
+        return toggleButton;
+    }
+
+    @FunctionalInterface
+    private interface SectionCollapseHandler
+    {
+        void setCollapsed(boolean collapsed);
+    }
+
+    private void rebuildSectionContent(JPanel contentPanel, ProfitTrackerPanelItem[] sectionItems, String emptyMessage)
+    {
+        contentPanel.removeAll();
+
+        if (sectionItems.length == 0)
+        {
+            contentPanel.add(createMessageLabel(emptyMessage));
+            return;
+        }
+
+        for (ProfitTrackerPanelItem item : sectionItems)
+        {
+            try
+            {
+                contentPanel.add(createItemRow(item));
+            }
+            catch (Exception ex)
+            {
+                contentPanel.add(createFallbackRow(item));
+            }
+        }
+    }
+
     private JPanel createItemRow(ProfitTrackerPanelItem item)
     {
         JPanel itemContainer = new JPanel();
         itemContainer.setBorder(BorderFactory.createEmptyBorder(1, 2, 1, 2));
         itemContainer.setLayout(new BoxLayout(itemContainer, BoxLayout.X_AXIS));
-        itemContainer.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        itemContainer.setBackground(ColorScheme.DARKER_GRAY_COLOR);
         itemContainer.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         JLabel iconLabel = new JLabel(new ImageIcon(item.getImage()));
@@ -209,7 +316,7 @@ public class ProfitTrackerPanel extends PluginPanel
 
         JPanel contentPanel = new JPanel();
         contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
-        contentPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        contentPanel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
         contentPanel.setBorder(new EmptyBorder(0, 4, 0, 0));
         contentPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         itemContainer.add(contentPanel);
@@ -232,7 +339,7 @@ public class ProfitTrackerPanel extends PluginPanel
     {
         JPanel row = new JPanel();
         row.setLayout(new BoxLayout(row, BoxLayout.X_AXIS));
-        row.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        row.setBackground(ColorScheme.DARKER_GRAY_COLOR);
         row.setBorder(BorderFactory.createEmptyBorder(3, 3, 3, 3));
         row.setAlignmentX(Component.LEFT_ALIGNMENT);
 
@@ -264,6 +371,7 @@ public class ProfitTrackerPanel extends PluginPanel
         JLabel label = new JLabel(text);
         label.setForeground(Color.LIGHT_GRAY);
         label.setAlignmentX(Component.LEFT_ALIGNMENT);
+        label.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
         return label;
     }
 
