@@ -448,7 +448,17 @@ public class ProfitTrackerInventoryValue {
                 .collect(Collectors.toMap(Item::getId, Item::getQuantity, Integer::sum));
     }
 
+    private static Item[] removePlaceholders(Item[] items, ItemManager manager){
+        return Arrays.stream(items)
+                .filter(item -> item.getId() != EMPTY_SLOT_ITEMID)
+                .filter(item -> manager.getItemComposition(item.getId()).getPlaceholderTemplateId() == -1)
+                .toArray(Item[]::new);
+    }
+
     public Item[] getItemCollectionDifference(Item[] originalItems, Item[] newItems, boolean replaceUntradeables){
+        originalItems = removePlaceholders(originalItems, itemManager);
+        newItems = removePlaceholders(newItems, itemManager);
+
         if (replaceUntradeables){
             //Replace untradeables with their equivalent items.
             //The replaceUntradeables function is inaccurate for very small amounts, so we need to perform it over the source
@@ -457,7 +467,7 @@ public class ProfitTrackerInventoryValue {
             originalItems = replaceUntradeables(originalItems);
             newItems = replaceUntradeables(newItems);
         }
-        return getItemCollectionDifference(originalItems, newItems);
+        return getItemCollectionDifference(originalItems, newItems, itemManager);
     }
 
     /**
@@ -465,7 +475,10 @@ public class ProfitTrackerInventoryValue {
      * For example, dropping a shark would be an array of 1 shark item, with quantity -1
      * @return Array of items with quantity set to the difference
      */
-    public static Item[] getItemCollectionDifference(Item[] originalItems, Item[] newItems){
+    public static Item[] getItemCollectionDifference(Item[] originalItems, Item[] newItems, ItemManager manager){
+        originalItems = removePlaceholders(originalItems, manager);
+        newItems = removePlaceholders(newItems, manager);
+
         Map<Integer, Integer> originalItemList = mapItemArray(originalItems);
         Map<Integer, Integer> newItemList = mapItemArray(newItems);
         //Subtract old quantities from new to get difference
