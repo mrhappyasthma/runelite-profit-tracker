@@ -75,6 +75,17 @@ public interface ProfitTrackerConfig extends Config
     }
 
     @ConfigItem(
+            keyName = "resetOnToggle",
+            name = "Reset on plugin toggle",
+            description = "Profit will be reset when the plugin is toggled on/off while logged in.",
+            section = BEHAVIOR_SETTINGS
+    )
+    default boolean resetOnToggle()
+    {
+        return true;
+    }
+
+    @ConfigItem(
             keyName = "shortDrops",
             name = "Shorten drop numbers",
             description = "Shorten drop numbers like 1.2K instead of 1,223, or 10M instead of 10,000,000.",

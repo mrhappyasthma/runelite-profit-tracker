@@ -124,6 +124,13 @@ public class ProfitTrackerPlugin extends Plugin
         inventoryValueObject = new ProfitTrackerInventoryValue(client, itemManager, config);
 
         initializeVariables();
+
+        checkAccount();
+        if (config.resetOnToggle() && client.getGameState() == GameState.LOGGED_IN) {
+            // This causes a reset of the tracker when the plugin is toggled while logged-in
+            // While it can be reset via shift + right click, this is useful legacy behavior, and likely more intuitive
+            activeTicks = 0;
+        }
     }
 
     private void initializeVariables()
