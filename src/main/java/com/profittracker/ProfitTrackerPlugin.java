@@ -846,8 +846,9 @@ public class ProfitTrackerPlugin extends Plugin
         if (accountRecord == null || accountRecord.itemDifferenceAccumulated == null) {
             return new Item[0];
         }
-
-        return Arrays.stream(accountRecord.itemDifferenceAccumulated.clone())
+        Item[] cleanItems = accountRecord.itemDifferenceAccumulated.clone();
+        cleanItems = inventoryValueObject.removePlaceholders(cleanItems);
+        return Arrays.stream(cleanItems)
                 .filter(item -> item.getId() >= 0 && item.getQuantity() != 0)
                 .toArray(Item[]::new);
     }
