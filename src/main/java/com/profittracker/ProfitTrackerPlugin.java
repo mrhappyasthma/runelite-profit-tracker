@@ -864,15 +864,20 @@ public class ProfitTrackerPlugin extends Plugin
         if (currentPanel != null) {
             clientThread.invoke(() -> {
                 if (panel != null) {
-                    currentPanel.setItems(buildPanelItems());
+                    currentPanel.setItems(buildPanelItems(accountRecord.itemDifferenceAccumulated),
+                            buildPanelItems(accountRecord.lastPossessionChange));
                 }
             });
         }
     }
 
-    private ProfitTrackerPanelItem[] buildPanelItems()
+    private ProfitTrackerPanelItem[] buildPanelItems(Item[] sourceItems)
     {
-        Item[] itemDifferences = getDisplayedItemDifferences();
+        if (sourceItems == null) {
+            return new ProfitTrackerPanelItem[0];
+        }
+
+        Item[] itemDifferences = inventoryValueObject.removePlaceholders(sourceItems.clone());
         List<ProfitTrackerPanelItem> panelItems = new ArrayList<>();
 
         for (Item itemDifference : itemDifferences) {
