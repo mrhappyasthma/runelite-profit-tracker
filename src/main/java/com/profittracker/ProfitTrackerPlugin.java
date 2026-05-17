@@ -17,17 +17,21 @@ import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ClientShutdown;
 import net.runelite.client.events.ConfigChanged;
-import net.runelite.client.events.ProfileChanged;
-import net.runelite.client.events.RuneScapeProfileChanged;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.chatbox.ChatboxPanelManager;
 import net.runelite.client.game.chatbox.ChatboxTextInput;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.ui.ClientToolbar;
+import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.ui.overlay.OverlayManager;
+import net.runelite.client.util.ImageUtil;
 import net.runelite.api.events.VarbitChanged;
 
+import java.awt.image.BufferedImage;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -113,6 +117,12 @@ public class ProfitTrackerPlugin extends Plugin
     @Inject
     private ChatboxPanelManager chatboxPanelManager;
 
+    @Inject
+    private ClientToolbar clientToolbar;
+
+    private NavigationButton navigationButton;
+    private ProfitTrackerPanel panel;
+
     @Override
     protected void startUp() throws Exception
     {
@@ -122,6 +132,16 @@ public class ProfitTrackerPlugin extends Plugin
         goldDropsObject = new ProfitTrackerGoldDrops(client, itemManager, config);
 
         inventoryValueObject = new ProfitTrackerInventoryValue(client, itemManager, config);
+
+        panel = new ProfitTrackerPanel(() -> clientThread.invoke(() -> resetSession(false)));
+
+        navigationButton = NavigationButton.builder()
+                .tooltip("Profit Tracker")
+                .icon(ImageUtil.loadImageResource(getClass(), "icon.png"))
+                .priority(3)
+                .panel(panel)
+                .build();
+        clientToolbar.addNavigation(navigationButton);
 
         initializeVariables();
 
@@ -178,6 +198,8 @@ public class ProfitTrackerPlugin extends Plugin
 
         overlay.startSession();
 
+        refreshPanel();
+
         inProfitTrackSession = true;
     }
 
@@ -190,6 +212,7 @@ public class ProfitTrackerPlugin extends Plugin
             accountRecord.save(gson);
             overlay.updateBankStatus(accountRecord);
         }
+        refreshPanel();
     }
 
     /**
@@ -235,6 +258,7 @@ public class ProfitTrackerPlugin extends Plugin
         overlay.updateActiveTicks(activeTicks);
 
         overlay.updateBankStatus(accountRecord);
+        refreshPanel();
 
         previousAccount = accountIdentifier;
     }
@@ -252,6 +276,11 @@ public class ProfitTrackerPlugin extends Plugin
     {
         // Remove the inventory overlay
         overlayManager.remove(overlay);
+        if (navigationButton != null) {
+            clientToolbar.removeNavigation(navigationButton);
+            navigationButton = null;
+        }
+        panel = null;
     }
 
     @Subscribe
@@ -314,6 +343,7 @@ public class ProfitTrackerPlugin extends Plugin
 
             accountRecord.profitAccumulated = totalProfit;
             overlay.updateProfitValue(totalProfit);
+            refreshPanel();
 
             inventoryValueChanged = false;
             bankValueChanged = false;
@@ -462,7 +492,7 @@ public class ProfitTrackerPlugin extends Plugin
 
         Item[] rawPossessionDifference = new Item[0];
         if (accountRecord.currentPossessions.getItems() != null) {
-            rawPossessionDifference = ProfitTrackerInventoryValue.getItemCollectionDifference(accountRecord.currentPossessions.getItems(), newItems);
+            rawPossessionDifference = ProfitTrackerInventoryValue.getItemCollectionDifference(accountRecord.currentPossessions.getItems(), newItems, itemManager);
         }
         if (rawPossessionDifference.length > 0) {
             // This block generally checks for possessions changing when they shouldn't be, often when closing storage the same tick as withdraw/depositing
@@ -471,7 +501,7 @@ public class ProfitTrackerPlugin extends Plugin
             // If bank/deposit box/depositing flag, any lost items are in bank, any gained items came from bank
             if (bankingItemsWithoutWidget) {
                 depositingItem = false;
-                Item[] bankChange = ProfitTrackerInventoryValue.getItemCollectionDifference(rawPossessionDifference, new Item[0]);
+                Item[] bankChange = ProfitTrackerInventoryValue.getItemCollectionDifference(rawPossessionDifference, new Item[0], itemManager);
                 if (accountRecord.currentPossessions.bankItems != null) {
                     newPossessions.bankItems = ProfitTrackerInventoryValue.getItemCollectionSum(accountRecord.currentPossessions.bankItems, bankChange);
                 } else {
@@ -482,16 +512,16 @@ public class ProfitTrackerPlugin extends Plugin
             }
             // If ge opened, gained items pull from ge, items banked will cause temporary desync
             if (grandExchangeOpened && !grandExchangeValueChanged) {
-                Item[] grandExchangeChange = ProfitTrackerInventoryValue.getItemCollectionDifference(rawPossessionDifference, new Item[0]);
+                Item[] grandExchangeChange = ProfitTrackerInventoryValue.getItemCollectionDifference(rawPossessionDifference, new Item[0], itemManager);
                 newPossessions.grandExchangeItems = ProfitTrackerInventoryValue.getItemCollectionSum(accountRecord.currentPossessions.grandExchangeItems, grandExchangeChange);
             }
             // If untracked storage, move lost items to untracked storage, add gained items to old record
             if (untrackedStorageOpened || depositingUntrackedItem) {
                 depositingUntrackedItem = false;
-                Item[] untrackedStorageChange = ProfitTrackerInventoryValue.getItemCollectionDifference(rawPossessionDifference, new Item[0]);
+                Item[] untrackedStorageChange = ProfitTrackerInventoryValue.getItemCollectionDifference(rawPossessionDifference, new Item[0], itemManager);
                 newPossessions.untrackedStorageItems = ProfitTrackerInventoryValue.getItemCollectionSum(newPossessions.untrackedStorageItems, untrackedStorageChange);
                 // If we go into the negatives, that means untrackedStorage originally had more items in it
-                Item[] missingItems = ProfitTrackerInventoryValue.getItemCollectionGain(ProfitTrackerInventoryValue.getItemCollectionDifference(newPossessions.untrackedStorageItems, new Item[0]));
+                Item[] missingItems = ProfitTrackerInventoryValue.getItemCollectionGain(ProfitTrackerInventoryValue.getItemCollectionDifference(newPossessions.untrackedStorageItems, new Item[0], itemManager));
                 // Ensure starting possessions has at least as many as were withdrawn
                 accountRecord.startingPossessions.untrackedStorageItems = ProfitTrackerInventoryValue.getItemCollectionSum(accountRecord.startingPossessions.untrackedStorageItems, missingItems);
                 accountRecord.currentPossessions.untrackedStorageItems = ProfitTrackerInventoryValue.getItemCollectionSum(accountRecord.currentPossessions.untrackedStorageItems, missingItems);
@@ -500,7 +530,7 @@ public class ProfitTrackerPlugin extends Plugin
 
             newItems = newPossessions.getItems();
             // This should always be empty in the event of a storage being opened
-            rawPossessionDifference = ProfitTrackerInventoryValue.getItemCollectionDifference(accountRecord.currentPossessions.getItems(), newItems);
+            rawPossessionDifference = ProfitTrackerInventoryValue.getItemCollectionDifference(accountRecord.currentPossessions.getItems(), newItems, itemManager);
             if (rawPossessionDifference.length > 0) {
                 accountRecord.lastPossessionChange = rawPossessionDifference;
                 accountRecord.itemDifferenceAccumulated = ProfitTrackerInventoryValue.getItemCollectionSum(accountRecord.itemDifferenceAccumulated, rawPossessionDifference);
@@ -767,6 +797,7 @@ public class ProfitTrackerPlugin extends Plugin
                     }
                 }
             });
+            refreshPanel();
         }
     }
 
@@ -775,6 +806,7 @@ public class ProfitTrackerPlugin extends Plugin
             totalProfit = inventoryValueObject.calculateItemValue(accountRecord.itemDifferenceAccumulated);
             accountRecord.profitAccumulated = totalProfit;
             overlay.updateProfitValue(totalProfit);
+            refreshPanel();
         }
     }
 
@@ -807,5 +839,50 @@ public class ProfitTrackerPlugin extends Plugin
                     });
                 })
                 .build();
+    }
+
+    public Item[] getDisplayedItemDifferences()
+    {
+        if (accountRecord == null || accountRecord.itemDifferenceAccumulated == null) {
+            return new Item[0];
+        }
+
+        return Arrays.stream(accountRecord.itemDifferenceAccumulated.clone())
+                .filter(item -> item.getId() >= 0 && item.getQuantity() != 0)
+                .toArray(Item[]::new);
+    }
+
+    public long getDisplayedItemProfit(Item item)
+    {
+        return inventoryValueObject.calculateItemValue(new Item[] {item});
+    }
+
+    private void refreshPanel()
+    {
+        ProfitTrackerPanel currentPanel = panel;
+        if (currentPanel != null) {
+            clientThread.invoke(() -> {
+                if (panel != null) {
+                    currentPanel.setItems(buildPanelItems());
+                }
+            });
+        }
+    }
+
+    private ProfitTrackerPanelItem[] buildPanelItems()
+    {
+        Item[] itemDifferences = getDisplayedItemDifferences();
+        List<ProfitTrackerPanelItem> panelItems = new ArrayList<>();
+
+        for (Item itemDifference : itemDifferences) {
+            int itemId = itemDifference.getId();
+            int quantity = itemDifference.getQuantity();
+            long profitChange = getDisplayedItemProfit(itemDifference);
+            String itemName = itemManager.getItemComposition(itemId).getName();
+            BufferedImage itemImage = itemManager.getImage(itemId, Math.max(1, Math.abs(quantity)), Math.abs(quantity) > 1);
+            panelItems.add(new ProfitTrackerPanelItem(itemId, itemName, quantity, profitChange, itemImage));
+        }
+
+        return panelItems.toArray(new ProfitTrackerPanelItem[0]);
     }
 }
