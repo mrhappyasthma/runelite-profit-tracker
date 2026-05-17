@@ -414,6 +414,10 @@ public class ProfitTrackerInventoryValue {
                     //Forestry basket can be dismantled to return log brace at no cost
                     extraItems = ArrayUtils.add(extraItems,new Item(ItemID.FORESTRY_STURDY_HARNESS,resultItems[i].getQuantity()));
                     break;
+                case ItemID.HORN_OF_PLENTY:
+                    //For some reason, charged horn of plenty has no value, causing wild profit swings, so we just leave it uncharged for calcs
+                    extraItems = ArrayUtils.add(extraItems,new Item(ItemID.HORN_OF_PLENTY_UNCHARGED,resultItems[i].getQuantity()));
+                    break;
                 //TODO Seedlings: Have unwatered seedlings turn into the seed + pot, and the watered versions into saplings
                 default:
                     replaceItem = false;
