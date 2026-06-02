@@ -24,6 +24,7 @@ public class ProfitTrackerPanel extends PluginPanel
 {
     private final JPanel listPanel;
     private final Runnable onReset;
+    private final Font largeFont = FontManager.getRunescapeBoldFont().deriveFont(16f);
     private ProfitTrackerPanelItem[] items = new ProfitTrackerPanelItem[0];
     private ProfitTrackerPanelItem[] lastChangeItems = new ProfitTrackerPanelItem[0];
     private boolean lastChangeCollapsed;
@@ -128,37 +129,6 @@ public class ProfitTrackerPanel extends PluginPanel
         return headerActions;
     }
 
-    private JPanel createSection(String title, ProfitTrackerPanelItem[] sectionItems, String emptyMessage)
-    {
-        JPanel sectionPanel = new JPanel();
-        sectionPanel.setLayout(new BoxLayout(sectionPanel, BoxLayout.Y_AXIS));
-        sectionPanel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-        sectionPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-        sectionPanel.add(createSectionHeader(title, getProfitTotal(sectionItems)));
-        sectionPanel.add(createSpacer());
-
-        if (sectionItems.length == 0)
-        {
-            sectionPanel.add(createMessageLabel(emptyMessage));
-            return sectionPanel;
-        }
-
-        for (ProfitTrackerPanelItem item : sectionItems)
-        {
-            try
-            {
-                sectionPanel.add(createItemRow(item));
-            }
-            catch (Exception ex)
-            {
-                sectionPanel.add(createFallbackRow(item));
-            }
-        }
-
-        return sectionPanel;
-    }
-
     private JPanel createCollapsibleSection(String title, ProfitTrackerPanelItem[] sectionItems, String emptyMessage,
                                             boolean collapsed, SectionCollapseHandler collapseHandler)
     {
@@ -201,7 +171,7 @@ public class ProfitTrackerPanel extends PluginPanel
 
         JLabel totalLabel = new JLabel(formatProfit(netTotal));
         totalLabel.setForeground(netTotal >= 0 ? Color.GREEN : Color.RED);
-        totalLabel.setFont(createLargeFont());
+        totalLabel.setFont(largeFont);
         totalLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         totalPanel.add(totalLabel);
 
@@ -224,7 +194,7 @@ public class ProfitTrackerPanel extends PluginPanel
 
         JLabel totalLabel = new JLabel(formatProfit(total));
         totalLabel.setForeground(total >= 0 ? Color.GREEN : Color.RED);
-        totalLabel.setFont(createLargeFont());
+        totalLabel.setFont(largeFont);
         headerPanel.add(totalLabel);
 
         return headerPanel;
@@ -250,7 +220,7 @@ public class ProfitTrackerPanel extends PluginPanel
 
         JLabel totalLabel = new JLabel(formatProfit(total));
         totalLabel.setForeground(total >= 0 ? Color.GREEN : Color.RED);
-        totalLabel.setFont(createLargeFont());
+        totalLabel.setFont(largeFont);
 
         toggleButton.add(sectionLabel);
         toggleButton.add(Box.createHorizontalGlue());
@@ -373,11 +343,6 @@ public class ProfitTrackerPanel extends PluginPanel
         label.setAlignmentX(Component.LEFT_ALIGNMENT);
         label.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
         return label;
-    }
-
-    private static Font createLargeFont()
-    {
-        return FontManager.getRunescapeBoldFont().deriveFont(16f);
     }
 
     private static long getProfitTotal(ProfitTrackerPanelItem[] sectionItems)

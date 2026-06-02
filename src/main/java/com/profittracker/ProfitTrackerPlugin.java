@@ -138,7 +138,7 @@ public class ProfitTrackerPlugin extends Plugin
         navigationButton = NavigationButton.builder()
                 .tooltip("Profit Tracker")
                 .icon(ImageUtil.loadImageResource(getClass(), "icon.png"))
-                .priority(3)
+                .priority(5)
                 .panel(panel)
                 .build();
         clientToolbar.addNavigation(navigationButton);
