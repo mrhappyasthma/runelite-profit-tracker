@@ -138,7 +138,7 @@ public class ProfitTrackerPlugin extends Plugin
         navigationButton = NavigationButton.builder()
                 .tooltip("Profit Tracker")
                 .icon(ImageUtil.loadImageResource(getClass(), "icon.png"))
-                .priority(5)
+                .priority(5) //Same priority as loot tracker, causing the icons to be close by, as their side panels have similar use cases
                 .panel(panel)
                 .build();
         clientToolbar.addNavigation(navigationButton);
