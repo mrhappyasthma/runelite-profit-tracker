@@ -73,8 +73,8 @@ public class ProfitTrackerInventoryValue {
         int quantitySold;
         int id;
         int totalQuantity;
-        int price;
-        int spent;
+        long price;
+        long spent;
         GrandExchangeOfferState state;
 
         public GrandExchangeOfferData(GrandExchangeOffer offer){
@@ -140,10 +140,10 @@ public class ProfitTrackerInventoryValue {
     /**
      * Returns the value of an item, based on the plugin configs value mode. (GE, high alch, shop, etc.)
      */
-    private int getItemValue(int itemID){
+    private long getItemValue(int itemID){
         switch (config.valueMode()){
             case GE_TAXED:
-                return (int) Math.ceil(itemManager.getItemPrice(itemID) * (1 - GE_TAX));
+                return (long) Math.ceil(itemManager.getItemPrice(itemID) * (1 - GE_TAX));
             case LOW_ALCH:
                 return (int) (itemManager.getItemComposition(itemID).getPrice() * ProfitTrackerShopValues.COMMON_LOW_ALCH);
             case SHOP_SPECIAL:
@@ -285,7 +285,9 @@ public class ProfitTrackerInventoryValue {
             switch (offer.state) {
                 case BOUGHT:
                 case BUYING:
-                    coins = new Item(ItemID.COINS, offer.price * (offer.totalQuantity - offer.quantitySold)); //Gold left to spend
+                    //Gold left to spend. Item quantities are int, so clamp rather than overflow into a negative stack
+                    long goldLeft = offer.price * (offer.totalQuantity - offer.quantitySold);
+                    coins = new Item(ItemID.COINS, (int) Math.min(goldLeft, Integer.MAX_VALUE));
                     items.add(coins);
                     break;
                 case SOLD:
