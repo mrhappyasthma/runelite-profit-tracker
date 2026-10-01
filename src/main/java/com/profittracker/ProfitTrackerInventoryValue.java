@@ -141,6 +141,13 @@ public class ProfitTrackerInventoryValue {
      * Returns the value of an item, based on the plugin configs value mode. (GE, high alch, shop, etc.)
      */
     private int getItemValue(int itemID){
+        // Don't adjust platinum tokens and coins as they are currency
+        switch (itemID){
+            case ItemID.COINS:
+            case ItemID.PLATINUM:
+                return itemManager.getItemPrice(itemID);
+        }
+
         switch (config.valueMode()){
             case GE_TAXED:
                 return (int) Math.ceil(itemManager.getItemPrice(itemID) * (1 - GE_TAX));
