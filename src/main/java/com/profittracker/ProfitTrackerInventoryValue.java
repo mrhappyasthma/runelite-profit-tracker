@@ -57,6 +57,7 @@ public class ProfitTrackerInventoryValue {
     };
 
     private static final double GE_TAX = 0.02;
+    private static final int PLATINUM_VALUE = 1000;
 
     private final ItemManager itemManager;
     private final Client client;
@@ -73,8 +74,8 @@ public class ProfitTrackerInventoryValue {
         int quantitySold;
         int id;
         int totalQuantity;
-        int price;
-        int spent;
+        long price;
+        long spent;
         GrandExchangeOfferState state;
 
         public GrandExchangeOfferData(GrandExchangeOffer offer){
@@ -134,13 +135,13 @@ public class ProfitTrackerInventoryValue {
         log.debug(String.format("calculateItemValue itemId = %d", itemId));
 
         // multiply quantity  by GE value
-        return (long) item.getQuantity() * (getItemValue(itemId));
+        return item.getQuantity() * (getItemValue(itemId));
     }
 
     /**
      * Returns the value of an item, based on the plugin configs value mode. (GE, high alch, shop, etc.)
      */
-    private int getItemValue(int itemID){
+    private long getItemValue(int itemID){
         // Don't adjust platinum tokens and coins as they are currency
         switch (itemID){
             case ItemID.COINS:
@@ -150,7 +151,7 @@ public class ProfitTrackerInventoryValue {
 
         switch (config.valueMode()){
             case GE_TAXED:
-                return (int) Math.ceil(itemManager.getItemPrice(itemID) * (1 - GE_TAX));
+                return (long) Math.ceil(itemManager.getItemPrice(itemID) * (1 - GE_TAX));
             case LOW_ALCH:
                 return (int) (itemManager.getItemComposition(itemID).getPrice() * ProfitTrackerShopValues.COMMON_LOW_ALCH);
             case SHOP_SPECIAL:
@@ -284,6 +285,7 @@ public class ProfitTrackerInventoryValue {
         ArrayList<Item> items = new ArrayList<> ();
         //Unclear why, but without an intermediate storage for this variable, just doing items.add(new ...) caused improper quantities
         Item coins;
+        Item platinumTokens;
         for (GrandExchangeOfferData offer : offers) {
             if (offer == null) {
                 items.add(new Item(-1, 0));
@@ -292,8 +294,21 @@ public class ProfitTrackerInventoryValue {
             switch (offer.state) {
                 case BOUGHT:
                 case BUYING:
-                    coins = new Item(ItemID.COINS, offer.price * (offer.totalQuantity - offer.quantitySold)); //Gold left to spend
-                    items.add(coins);
+                    long goldLeft = offer.price * (offer.totalQuantity - offer.quantitySold); //Gold left to spend
+                    if (goldLeft > Integer.MAX_VALUE) {
+                        // Value larger than max cash stack, split into cash + platinum
+                        // Max cash doesn't split into platinum perfectly, so we need to get the plat quantity first and round up
+                        long platinum = (long) Math.ceil((goldLeft - Integer.MAX_VALUE) / (double) PLATINUM_VALUE);
+                        goldLeft = goldLeft - platinum * PLATINUM_VALUE;
+                        coins = new Item(ItemID.COINS, (int) goldLeft);
+                        items.add(coins);
+                        platinumTokens = new Item(ItemID.PLATINUM, (int) platinum);
+                        items.add(platinumTokens);
+                    } else {
+                        coins = new Item(ItemID.COINS, (int) goldLeft);
+                        items.add(coins);
+                    }
+
                     break;
                 case SOLD:
                 case SELLING:
