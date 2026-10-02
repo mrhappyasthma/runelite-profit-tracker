@@ -286,7 +286,7 @@ public class ProfitTrackerInventoryValue {
                 case BOUGHT:
                 case BUYING:
                     //Gold left to spend. Item quantities are int, so clamp rather than overflow into a negative stack
-                    long goldLeft = offer.price * (offer.totalQuantity - offer.quantitySold);
+                    long goldLeft = (long)offer.price * (offer.totalQuantity - offer.quantitySold);
                     coins = new Item(ItemID.COINS, (int) Math.min(goldLeft, Integer.MAX_VALUE));
                     items.add(coins);
                     break;
